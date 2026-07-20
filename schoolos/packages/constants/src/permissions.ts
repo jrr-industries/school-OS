@@ -96,6 +96,69 @@ export const PERMISSIONS = {
   SYSTEM_MANAGE: 'system:manage',
   SYSTEM_LOGS: 'system:logs',
   SYSTEM_BACKUP: 'system:backup',
+
+  // Student permissions
+  STUDENT_CREATE: 'students:create',
+  STUDENT_READ: 'students:read',
+  STUDENT_UPDATE: 'students:update',
+  STUDENT_DELETE: 'students:delete',
+  STUDENT_MANAGE: 'students:manage',
+  STUDENT_ARCHIVE: 'students:archive',
+  STUDENT_RESTORE: 'students:restore',
+  STUDENT_PROMOTE: 'students:promote',
+  STUDENT_TRANSFER: 'students:transfer',
+  STUDENT_EXPORT: 'students:export',
+  STUDENT_IMPORT: 'students:import',
+  STUDENT_APPROVE: 'students:approve',
+
+  // Parent permissions
+  PARENT_CREATE: 'parents:create',
+  PARENT_READ: 'parents:read',
+  PARENT_UPDATE: 'parents:update',
+  PARENT_DELETE: 'parents:delete',
+  PARENT_MANAGE: 'parents:manage',
+
+  // Academic permissions
+  ACADEMIC_YEAR_CREATE: 'academic_years:create',
+  ACADEMIC_YEAR_READ: 'academic_years:read',
+  ACADEMIC_YEAR_UPDATE: 'academic_years:update',
+  ACADEMIC_YEAR_DELETE: 'academic_years:delete',
+  ACADEMIC_YEAR_MANAGE: 'academic_years:manage',
+
+  // Class permissions
+  CLASS_CREATE: 'classes:create',
+  CLASS_READ: 'classes:read',
+  CLASS_UPDATE: 'classes:update',
+  CLASS_DELETE: 'classes:delete',
+  CLASS_MANAGE: 'classes:manage',
+
+  // Section permissions
+  SECTION_CREATE: 'sections:create',
+  SECTION_READ: 'sections:read',
+  SECTION_UPDATE: 'sections:update',
+  SECTION_DELETE: 'sections:delete',
+  SECTION_MANAGE: 'sections:manage',
+
+  // Subject permissions
+  SUBJECT_CREATE: 'subjects:create',
+  SUBJECT_READ: 'subjects:read',
+  SUBJECT_UPDATE: 'subjects:update',
+  SUBJECT_DELETE: 'subjects:delete',
+  SUBJECT_MANAGE: 'subjects:manage',
+
+  // Campus permissions
+  CAMPUS_CREATE: 'campuses:create',
+  CAMPUS_READ: 'campuses:read',
+  CAMPUS_UPDATE: 'campuses:update',
+  CAMPUS_DELETE: 'campuses:delete',
+  CAMPUS_MANAGE: 'campuses:manage',
+
+  // Document permissions
+  DOCUMENT_CREATE: 'documents:create',
+  DOCUMENT_READ: 'documents:read',
+  DOCUMENT_UPDATE: 'documents:update',
+  DOCUMENT_DELETE: 'documents:delete',
+  DOCUMENT_VERIFY: 'documents:verify',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

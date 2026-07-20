@@ -4,4 +4,7 @@ export { SchoolRepository } from './repositories/school.repository';
 export { UserRepository } from './repositories/user.repository';
 export { RoleRepository } from './repositories/role.repository';
 export { PermissionRepository } from './repositories/permission.repository';
+export { StudentRepository } from './repositories/student.repository';
+export { AcademicYearRepository, AcademicTermRepository, CampusRepository, BuildingRepository, RoomRepository, DepartmentRepository, SubjectGroupRepository, SubjectRepository, StudentClassRepository, SectionRepository, StudentCategoryRepository, StudentHouseRepository, AdmissionSourceRepository } from './repositories/academic.repository';
+export { ParentRepository } from './repositories/parent.repository';
 export type { PrismaTransaction } from './types';

@@ -51,6 +51,61 @@ const SYSTEM_PERMISSIONS = [
   { name: 'Manage System', slug: 'system:manage', group: 'system', isSystem: true },
   { name: 'View System Logs', slug: 'system:logs', group: 'system', isSystem: true },
   { name: 'System Backup', slug: 'system:backup', group: 'system', isSystem: true },
+  // Student permissions
+  { name: 'Create Student', slug: 'students:create', group: 'students', isSystem: true },
+  { name: 'Read Student', slug: 'students:read', group: 'students', isSystem: true },
+  { name: 'Update Student', slug: 'students:update', group: 'students', isSystem: true },
+  { name: 'Delete Student', slug: 'students:delete', group: 'students', isSystem: true },
+  { name: 'Manage Student', slug: 'students:manage', group: 'students', isSystem: true },
+  { name: 'Archive Student', slug: 'students:archive', group: 'students', isSystem: true },
+  { name: 'Restore Student', slug: 'students:restore', group: 'students', isSystem: true },
+  { name: 'Promote Student', slug: 'students:promote', group: 'students', isSystem: true },
+  { name: 'Transfer Student', slug: 'students:transfer', group: 'students', isSystem: true },
+  { name: 'Export Student', slug: 'students:export', group: 'students', isSystem: true },
+  { name: 'Import Student', slug: 'students:import', group: 'students', isSystem: true },
+  { name: 'Approve Student', slug: 'students:approve', group: 'students', isSystem: true },
+  // Parent permissions
+  { name: 'Create Parent', slug: 'parents:create', group: 'parents', isSystem: true },
+  { name: 'Read Parent', slug: 'parents:read', group: 'parents', isSystem: true },
+  { name: 'Update Parent', slug: 'parents:update', group: 'parents', isSystem: true },
+  { name: 'Delete Parent', slug: 'parents:delete', group: 'parents', isSystem: true },
+  { name: 'Manage Parent', slug: 'parents:manage', group: 'parents', isSystem: true },
+  // Academic year permissions
+  { name: 'Create Academic Year', slug: 'academic_years:create', group: 'academic_years', isSystem: true },
+  { name: 'Read Academic Year', slug: 'academic_years:read', group: 'academic_years', isSystem: true },
+  { name: 'Update Academic Year', slug: 'academic_years:update', group: 'academic_years', isSystem: true },
+  { name: 'Delete Academic Year', slug: 'academic_years:delete', group: 'academic_years', isSystem: true },
+  { name: 'Manage Academic Year', slug: 'academic_years:manage', group: 'academic_years', isSystem: true },
+  // Class permissions
+  { name: 'Create Class', slug: 'classes:create', group: 'classes', isSystem: true },
+  { name: 'Read Class', slug: 'classes:read', group: 'classes', isSystem: true },
+  { name: 'Update Class', slug: 'classes:update', group: 'classes', isSystem: true },
+  { name: 'Delete Class', slug: 'classes:delete', group: 'classes', isSystem: true },
+  { name: 'Manage Class', slug: 'classes:manage', group: 'classes', isSystem: true },
+  // Section permissions
+  { name: 'Create Section', slug: 'sections:create', group: 'sections', isSystem: true },
+  { name: 'Read Section', slug: 'sections:read', group: 'sections', isSystem: true },
+  { name: 'Update Section', slug: 'sections:update', group: 'sections', isSystem: true },
+  { name: 'Delete Section', slug: 'sections:delete', group: 'sections', isSystem: true },
+  { name: 'Manage Section', slug: 'sections:manage', group: 'sections', isSystem: true },
+  // Subject permissions
+  { name: 'Create Subject', slug: 'subjects:create', group: 'subjects', isSystem: true },
+  { name: 'Read Subject', slug: 'subjects:read', group: 'subjects', isSystem: true },
+  { name: 'Update Subject', slug: 'subjects:update', group: 'subjects', isSystem: true },
+  { name: 'Delete Subject', slug: 'subjects:delete', group: 'subjects', isSystem: true },
+  { name: 'Manage Subject', slug: 'subjects:manage', group: 'subjects', isSystem: true },
+  // Campus permissions
+  { name: 'Create Campus', slug: 'campuses:create', group: 'campuses', isSystem: true },
+  { name: 'Read Campus', slug: 'campuses:read', group: 'campuses', isSystem: true },
+  { name: 'Update Campus', slug: 'campuses:update', group: 'campuses', isSystem: true },
+  { name: 'Delete Campus', slug: 'campuses:delete', group: 'campuses', isSystem: true },
+  { name: 'Manage Campus', slug: 'campuses:manage', group: 'campuses', isSystem: true },
+  // Document permissions
+  { name: 'Create Document', slug: 'documents:create', group: 'documents', isSystem: true },
+  { name: 'Read Document', slug: 'documents:read', group: 'documents', isSystem: true },
+  { name: 'Update Document', slug: 'documents:update', group: 'documents', isSystem: true },
+  { name: 'Delete Document', slug: 'documents:delete', group: 'documents', isSystem: true },
+  { name: 'Verify Document', slug: 'documents:verify', group: 'documents', isSystem: true },
 ];
 
 async function main(): Promise<void> {

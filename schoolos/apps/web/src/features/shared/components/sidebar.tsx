@@ -19,8 +19,9 @@ import { useUserStore } from '@schoolos/hooks';
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Students', href: '/students', icon: GraduationCap },
-  { name: 'Teachers', href: '/teachers', icon: Users },
+  { name: 'Parents', href: '/parents', icon: Users },
   { name: 'Classes', href: '/classes', icon: BookOpen },
+  { name: 'Subjects', href: '/subjects', icon: BookOpen },
   { name: 'Schedule', href: '/schedule', icon: Calendar },
   { name: 'Fees', href: '/fees', icon: CreditCard },
 ];
