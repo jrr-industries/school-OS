@@ -1,11 +1,19 @@
 /**
  * Data Service Layer
- * 
+ *
  * Provides a unified interface for data access.
  * Currently uses mock data, but designed to easily switch to API calls.
- * 
+ *
  * To switch to API: change `useMockData` to `false` and the service
  * will use the ApiClient to fetch from the backend.
+ *
+ * Phase 1 API endpoints (when useMockData = false):
+ *   GET  /api/{module}          — List (paginated, filtered, sorted)
+ *   POST /api/{module}          — Create
+ *   GET  /api/{module}/:id      — Get by ID
+ *   PUT  /api/{module}/:id      — Update
+ *   DELETE /api/{module}/:id    — Soft delete
+ *   GET  /api/dashboard         — Dashboard analytics
  */
 
 import { apiClient } from './api-client';
@@ -36,20 +44,63 @@ const useMockData = true;
 // Re-export types for convenience
 export type { Student, Teacher, School, Parent, AttendanceRecord };
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** Generic paginated response from the API */
+export interface PaginatedResponse<T> {
+  success: boolean;
+  data: T[];
+  meta?: {
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
+}
+
+/** Generic single item response from the API */
+export interface ItemResponse<T> {
+  success: boolean;
+  data: T;
+}
+
+/** Query parameters for list endpoints */
+export interface ListQuery {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  status?: string;
+  schoolId?: string;
+  branchId?: string;
+  [key: string]: string | number | undefined;
+}
+
+/**
+ * Build a query string from a params object.
+ * Filters out undefined and empty values.
+ */
+function buildQuery(params: ListQuery): string {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') {
+      searchParams.set(key, String(value));
+    }
+  }
+  const qs = searchParams.toString();
+  return qs ? `?${qs}` : '';
 }
 
 export const dataService = {
-  // Dashboard
+  // ── Dashboard ──────────────────────────────────────────
   async getDashboardStats() {
     if (useMockData) return dashboardStats;
-    return apiClient.fetch('/dashboard/stats');
+    return apiClient.fetch('/dashboard');
   },
 
   async getSchoolGrowthData() {
     if (useMockData) return schoolGrowthData;
-    return apiClient.fetch('/dashboard/school-growth');
+    const res = await apiClient.fetch<PaginatedResponse<unknown>>('/dashboard');
+    return (res as any)?.monthlySchoolGrowth || schoolGrowthData;
   },
 
   async getRevenueData() {
@@ -69,7 +120,8 @@ export const dataService = {
 
   async getSubscriptionOverview() {
     if (useMockData) return subscriptionOverview;
-    return apiClient.fetch('/dashboard/subscriptions');
+    const res = await apiClient.fetch<PaginatedResponse<unknown>>('/dashboard');
+    return (res as any)?.subscriptionOverview || subscriptionOverview;
   },
 
   async getRecentPayments() {
@@ -82,41 +134,116 @@ export const dataService = {
     return apiClient.fetch('/notifications');
   },
 
-  // Students
-  async getStudents(): Promise<Student[]> {
+  // ── Students ───────────────────────────────────────────
+  async getStudents(params: ListQuery = {}): Promise<Student[]> {
     if (useMockData) return students;
-    return apiClient.fetch('/students', { ttl: 2 * 60 * 1000 });
+    const res = await apiClient.fetch<PaginatedResponse<Student>>(`/students${buildQuery(params)}`);
+    return res.data;
   },
 
-  // Teachers
-  async getTeachers(): Promise<Teacher[]> {
+  // ── Teachers ───────────────────────────────────────────
+  async getTeachers(params: ListQuery = {}): Promise<Teacher[]> {
     if (useMockData) return teachers;
-    return apiClient.fetch('/teachers', { ttl: 2 * 60 * 1000 });
+    const res = await apiClient.fetch<PaginatedResponse<Teacher>>(`/teachers${buildQuery(params)}`);
+    return res.data;
   },
 
-  // Schools
-  async getSchools(): Promise<School[]> {
+  // ── Schools ────────────────────────────────────────────
+  async getSchools(params: ListQuery = {}): Promise<School[]> {
     if (useMockData) return schools;
-    return apiClient.fetch('/schools', { ttl: 2 * 60 * 1000 });
+    const res = await apiClient.fetch<PaginatedResponse<School>>(`/schools${buildQuery(params)}`);
+    return res.data;
   },
 
-  // Parents
-  async getParents(): Promise<Parent[]> {
+  async getSchoolById(id: string) {
+    if (useMockData) return schools.find((s) => s.id === id) || null;
+    return apiClient.fetch<ItemResponse<School>>(`/schools/${id}`);
+  },
+
+  // ── Parents ────────────────────────────────────────────
+  async getParents(params: ListQuery = {}): Promise<Parent[]> {
     if (useMockData) return parents;
-    return apiClient.fetch('/parents', { ttl: 2 * 60 * 1000 });
+    const res = await apiClient.fetch<PaginatedResponse<Parent>>(`/parents${buildQuery(params)}`);
+    return res.data;
   },
 
-  // Attendance
-  async getAttendanceRecords(): Promise<AttendanceRecord[]> {
+  // ── Attendance ─────────────────────────────────────────
+  async getAttendanceRecords(params: ListQuery = {}): Promise<AttendanceRecord[]> {
     if (useMockData) return attendanceRecords;
-    return apiClient.fetch('/attendance', { ttl: 60 * 1000 });
+    const res = await apiClient.fetch<PaginatedResponse<AttendanceRecord>>(`/attendance${buildQuery(params)}`);
+    return res.data;
   },
 
-  /** Prefetch commonly used data */
+  // ── Branches ───────────────────────────────────────────
+  async getBranches(params: ListQuery = {}) {
+    if (useMockData) return []; // Not available in mock data
+    const res = await apiClient.fetch<PaginatedResponse<unknown>>(`/branches${buildQuery(params)}`);
+    return res.data;
+  },
+
+  // ── Academic Years ─────────────────────────────────────
+  async getAcademicYears(params: ListQuery = {}) {
+    if (useMockData) return [];
+    const res = await apiClient.fetch<PaginatedResponse<unknown>>(`/academic-years${buildQuery(params)}`);
+    return res.data;
+  },
+
+  // ── Classes ────────────────────────────────────────────
+  async getClasses(params: ListQuery = {}) {
+    if (useMockData) return [];
+    const res = await apiClient.fetch<PaginatedResponse<unknown>>(`/classes${buildQuery(params)}`);
+    return res.data;
+  },
+
+  // ── Sections ───────────────────────────────────────────
+  async getSections(params: ListQuery = {}) {
+    if (useMockData) return [];
+    const res = await apiClient.fetch<PaginatedResponse<unknown>>(`/sections${buildQuery(params)}`);
+    return res.data;
+  },
+
+  // ── Subjects ───────────────────────────────────────────
+  async getSubjects(params: ListQuery = {}) {
+    if (useMockData) return [];
+    const res = await apiClient.fetch<PaginatedResponse<unknown>>(`/subjects${buildQuery(params)}`);
+    return res.data;
+  },
+
+  // ── Calendar Events ────────────────────────────────────
+  async getCalendarEvents(params: ListQuery = {}) {
+    if (useMockData) return [];
+    const res = await apiClient.fetch<PaginatedResponse<unknown>>(`/calendar-events${buildQuery(params)}`);
+    return res.data;
+  },
+
+  // ── Announcements ──────────────────────────────────────
+  async getAnnouncements(params: ListQuery = {}) {
+    if (useMockData) return [];
+    const res = await apiClient.fetch<PaginatedResponse<unknown>>(`/announcements${buildQuery(params)}`);
+    return res.data;
+  },
+
+  // ── Tasks ──────────────────────────────────────────────
+  async getTasks(params: ListQuery = {}) {
+    if (useMockData) return [];
+    const res = await apiClient.fetch<PaginatedResponse<unknown>>(`/tasks${buildQuery(params)}`);
+    return res.data;
+  },
+
+  // ── Utility ────────────────────────────────────────────
+
+  /** Prefetch commonly used data for faster navigation */
   prefetchCommonData(): void {
     if (useMockData) return;
-    apiClient.prefetch('/students');
-    apiClient.prefetch('/attendance');
-    apiClient.prefetch('/teachers');
+    apiClient.prefetch('/api/dashboard');
+    apiClient.prefetch('/api/schools?pageSize=5');
+    apiClient.prefetch('/api/calendar-events?pageSize=5&sortBy=eventDate&sortOrder=asc');
+    apiClient.prefetch('/api/announcements?pageSize=5&status=PUBLISHED');
+    apiClient.prefetch('/api/tasks?pageSize=5');
+  },
+
+  /** Invalidate cache for a specific module */
+  invalidateCache(module: string): void {
+    apiClient.invalidate(`/api/${module}`);
   },
 };
