@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Search, ChevronUp, ChevronDown, ChevronsUpDown, Eye, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,11 @@ function SortIcon({ direction }: { direction: 'asc' | 'desc' | null }) {
   return <ChevronsUpDown className="size-3.5 text-muted-foreground/40" />;
 }
 
+/** Minimum number of rows to trigger virtualization */
+const VIRTUALIZATION_THRESHOLD = 50;
+/** Estimated row height in pixels for virtualizer */
+const ESTIMATED_ROW_HEIGHT = 56;
+
 export function DataTable<T>({
   columns,
   data,
@@ -81,9 +87,35 @@ export function DataTable<T>({
   const [internalSearch, setInternalSearch] = useState('');
   const [internalSortKey, setInternalSortKey] = useState<string | null>(null);
   const [internalSortDir, setInternalSortDir] = useState<'asc' | 'desc'>('asc');
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const isControlled = searchValue !== undefined;
   const currentSearch = isControlled ? searchValue : internalSearch;
+
+  // Debounced search handler for controlled mode
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setInternalPage(0);
+      if (onSearchChange) {
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = setTimeout(() => {
+          onSearchChange(value);
+        }, 150);
+      } else {
+        setInternalSearch(value);
+      }
+    },
+    [onSearchChange],
+  );
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, []);
+
   const currentSortKey = externalSortKey !== undefined ? externalSortKey : internalSortKey;
   const currentSortDir = externalSortDir !== undefined ? externalSortDir : internalSortDir;
 
@@ -118,15 +150,6 @@ export function DataTable<T>({
   const currentPage = Math.min(internalPage, totalPages - 1);
   const paginatedData = sortedData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
-  const handleSearchChange = useCallback(
-    (value: string) => {
-      setInternalPage(0);
-      if (onSearchChange) onSearchChange(value);
-      else setInternalSearch(value);
-    },
-    [onSearchChange],
-  );
-
   const handleSort = useCallback(
     (key: string) => {
       if (externalOnSort) {
@@ -142,6 +165,15 @@ export function DataTable<T>({
     },
     [internalSortKey, externalOnSort],
   );
+
+  // Virtualization setup for large datasets
+  const shouldVirtualize = sortedData.length > VIRTUALIZATION_THRESHOLD && !isLoading;
+  const virtualizer = useVirtualizer({
+    count: shouldVirtualize ? paginatedData.length : 0,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: 5,
+  });
 
   if (isLoading) {
     return (
@@ -224,7 +256,11 @@ export function DataTable<T>({
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border/60">
-        <div className="overflow-x-auto">
+        <div
+          ref={tableContainerRef}
+          className="overflow-x-auto overflow-y-auto"
+          style={{ maxHeight: shouldVirtualize ? '600px' : undefined }}
+        >
           <table className="w-full">
             <thead>
               <tr className="border-b border-border/40 bg-background">
@@ -250,35 +286,79 @@ export function DataTable<T>({
                 ))}
               </tr>
             </thead>
-            <tbody>
-              {paginatedData.map((item) => {
-                const key = keyExtractor(item);
-                return (
-                  <tr
-                    key={key}
-                    className={cn(
-                      'border-b border-border/20 transition-all duration-100 last:border-0',
-                      onRowClick && 'cursor-pointer',
-                      'hover:bg-background',
-                    )}
-                    onClick={() => onRowClick?.(item)}
-                  >
-                    {columns.map((col) => (
-                      <td
-                        key={col.key}
-                        className={cn(
-                          'px-5 py-4 text-sm',
-                          col.hideOnMobile && 'hidden sm:table-cell',
-                          col.className,
-                        )}
-                      >
-                        {col.render(item)}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
+            {shouldVirtualize ? (
+              <tbody
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  position: 'relative',
+                }}
+              >
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const item = paginatedData[virtualRow.index];
+                  return (
+                    <tr
+                      key={keyExtractor(item)}
+                      className={cn(
+                        'border-b border-border/20 transition-all duration-100 last:border-0',
+                        onRowClick && 'cursor-pointer',
+                        'hover:bg-background',
+                      )}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                      onClick={() => onRowClick?.(item)}
+                    >
+                      {columns.map((col) => (
+                        <td
+                          key={col.key}
+                          className={cn(
+                            'px-5 py-4 text-sm',
+                            col.hideOnMobile && 'hidden sm:table-cell',
+                            col.className,
+                          )}
+                        >
+                          {col.render(item)}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            ) : (
+              <tbody>
+                {paginatedData.map((item) => {
+                  const key = keyExtractor(item);
+                  return (
+                    <tr
+                      key={key}
+                      className={cn(
+                        'border-b border-border/20 transition-all duration-100 last:border-0',
+                        onRowClick && 'cursor-pointer',
+                        'hover:bg-background',
+                      )}
+                      onClick={() => onRowClick?.(item)}
+                    >
+                      {columns.map((col) => (
+                        <td
+                          key={col.key}
+                          className={cn(
+                            'px-5 py-4 text-sm',
+                            col.hideOnMobile && 'hidden sm:table-cell',
+                            col.className,
+                          )}
+                        >
+                          {col.render(item)}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            )}
           </table>
         </div>
       </div>

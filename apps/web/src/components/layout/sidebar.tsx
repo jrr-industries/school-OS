@@ -67,13 +67,13 @@ const NavItem = memo(function NavItem({
   isCollapsed: boolean;
   badge?: string | number;
   depth?: number;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
 }) {
   const link = (
     <Link
       href={disabled ? '#' : href}
       prefetch={true}
-      onClick={disabled ? (e) => e.preventDefault() : onClick}
+      onClick={disabled ? (e) => e.preventDefault() : (e) => onClick?.(e)}
       className={cn(
         'group/sidebar-link relative flex items-center gap-3 text-sm font-medium',
         'transition-all duration-100',
@@ -136,9 +136,14 @@ const NavItemWithActive = memo(function NavItemWithActive({
     useCallback((s) => isActiveRoute(s.activePath, href), [href]),
   );
   const setActivePath = useActivePathStore((s) => s.setActivePath);
-  const handleClick = useCallback(() => {
-    setActivePath(href);
-  }, [href, setActivePath]);
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      // Let Next.js <Link> handle the navigation normally (client-side routing)
+      setActivePath(href);
+    },
+    [href, setActivePath],
+  );
 
   return (
     <NavItem

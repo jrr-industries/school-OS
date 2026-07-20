@@ -1,0 +1,75 @@
+# =============================================================================
+# SchoolOS — Docker Production Override
+# =============================================================================
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Frontend — Production build (standalone mode, no volumes)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      target: production
+    volumes: []
+    environment:
+      NODE_ENV: production
+
+  # ---------------------------------------------------------------------------
+  # Backend API — Production
+  # ---------------------------------------------------------------------------
+  # Uncomment when backend is implemented:
+  #
+  # backend:
+  #   build:
+  #     target: production
+  #   volumes: []
+  #   environment:
+  #     NODE_ENV: production
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — Production hardening
+  # ---------------------------------------------------------------------------
+  postgres:
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+  # ---------------------------------------------------------------------------
+  # Redis — Production hardening
+  # ---------------------------------------------------------------------------
+  redis:
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+
+  # ---------------------------------------------------------------------------
+  # pgAdmin — Production hardening
+  # ---------------------------------------------------------------------------
+  pgadmin:
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+
+# =============================================================================
+# Volumes (production names use a project-specific prefix)
+# =============================================================================
+volumes:
+  postgres_data:
+    name: schoolos_postgres_data
+  redis_data:
+    name: schoolos_redis_data
+  pgadmin_data:
+    name: schoolos_pgadmin_data
+
+# =============================================================================
+# Networks (production-specific settings)
+# =============================================================================
+networks:
+  schoolos-network:
+    name: schoolos_production_network
+    driver: bridge
