@@ -12,9 +12,9 @@ import {
   SelectItem, cn,
 } from '@schoolos/ui';
 import { toast } from 'sonner';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
-import type { SchoolAdminUser } from '@/features/firebase/types';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import type { SchoolAdminUser } from '@/features/school-admin/types';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 
 interface Session {
@@ -50,7 +50,7 @@ const themes = [
 ];
 
 export default function ProfilePage() {
-  const { user, schoolId, loading: authLoading } = useFirebaseAuth();
+  const { user, schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [profile, setProfile] = useState<SchoolAdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,7 +82,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribe<Record<string, unknown>>(`schools/${schoolId}`, (data) => {
+    const unsub = SupabaseService.subscribe('schools', schoolId, (data) => {
       if (data) {
         setLanguage((data.language as string) || 'en');
         setTheme((data.theme as string) || 'system');

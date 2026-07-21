@@ -10,10 +10,10 @@ import {
   Button, Input, Card, CardContent, CardHeader, CardTitle, Badge, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Textarea, cn
 } from '@schoolos/ui';
 import { PageHeader } from '@/features/school-admin/components/page-header';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { toast } from 'sonner';
-import type { Notification } from '@/features/firebase/types';
+import type { Notification } from '@/features/school-admin/types';
 
 const TARGET_OPTIONS = [
   { value: 'all', label: 'Entire School', icon: Users },
@@ -67,7 +67,7 @@ const initialForm: FormState = {
 };
 
 export default function CommunicationPage() {
-  const { user, schoolId } = useFirebaseAuth();
+  const { user, schoolId } = useSchoolAdminAuth();
   const [form, setForm] = useState<FormState>(initialForm);
   const [sending, setSending] = useState(false);
   const [messages, setMessages] = useState<Notification[]>([]);
@@ -76,8 +76,8 @@ export default function CommunicationPage() {
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribeList<Notification>(
-      `schools/${schoolId}/notifications`,
+    const unsub = SupabaseService.subscribeList<Notification>(
+      'notifications', schoolId,
       (items) => {
         setMessages(items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         setLoading(false);
@@ -99,8 +99,8 @@ export default function CommunicationPage() {
     if (!schoolId || !user) return;
     setSending(true);
     try {
-      await RealtimeService.push(`schools/${schoolId}/notifications`, {
-        schoolId,
+      await SupabaseService.insert('notifications', {
+        school_id: schoolId,
         title: form.title.trim(),
         message: form.message.trim(),
         type: form.type,

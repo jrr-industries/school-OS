@@ -249,7 +249,7 @@ const seedSections: SectionSeed[] = [
       { label: 'WhatsApp', slug: 'whatsapp', icon: MessageCircle, kind: 'settings', permission: 'integrations:manage', searchable: true, filters: ['Number', 'Template', 'Status'], primaryAction: 'Connect WhatsApp' },
       { label: 'Google Workspace', slug: 'google-workspace', icon: Globe, kind: 'settings', permission: 'integrations:manage', searchable: true, filters: ['Domain', 'Sync', 'Status'], primaryAction: 'Authorize Google' },
       { label: 'Microsoft 365', slug: 'microsoft-365', icon: MonitorSmartphone, kind: 'settings', permission: 'integrations:manage', searchable: true, filters: ['Tenant', 'Sync', 'Status'], primaryAction: 'Authorize Microsoft' },
-      { label: 'Firebase', slug: 'firebase', icon: Sparkles, kind: 'settings', permission: 'integrations:manage', searchable: true, filters: ['Project', 'Environment', 'Status'], primaryAction: 'Link Firebase' },
+      { label: 'Supabase', slug: 'supabase', icon: Database, kind: 'settings', permission: 'integrations:manage', searchable: true, filters: ['Project', 'Environment', 'Status'], primaryAction: 'Link Supabase' },
     ],
   },
   {

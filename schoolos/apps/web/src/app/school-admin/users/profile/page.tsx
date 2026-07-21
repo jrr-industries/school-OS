@@ -14,9 +14,9 @@ import {
   Button, Badge, Card, CardContent, CardHeader, CardTitle, Modal, Skeleton, cn
 } from '@schoolos/ui';
 import { PageHeader } from '@/features/school-admin/components/page-header';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
-import type { SchoolAdminUser, AuditLogEntry } from '@/features/firebase/types';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import type { SchoolAdminUser, AuditLogEntry } from '@/features/school-admin/types';
 
 const statusConfig: Record<string, { variant: 'success' | 'warning' | 'destructive' | 'info'; label: string }> = {
   active: { variant: 'success', label: 'Active' },
@@ -42,7 +42,7 @@ const roleLabels: Record<string, string> = {
 export default function UserProfilePage() {
   const searchParams = useSearchParams();
   const userId = searchParams.get('id');
-  const { schoolId } = useFirebaseAuth();
+  const { schoolId } = useSchoolAdminAuth();
 
   const [userData, setUserData] = useState<SchoolAdminUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,8 +62,8 @@ export default function UserProfilePage() {
     setLoading(true);
     setError('');
 
-    const unsub = RealtimeService.subscribe<SchoolAdminUser>(
-      `schools/${schoolId}/users/${userId}`,
+    const unsub = SupabaseService.subscribe<SchoolAdminUser>(
+      'users', userId,
       (data) => {
         if (data) {
           setUserData(data);
@@ -75,8 +75,8 @@ export default function UserProfilePage() {
       },
     );
 
-    const unsubAudit = RealtimeService.subscribeList<AuditLogEntry>(
-      `schools/${schoolId}/auditLogs`,
+    const unsubAudit = SupabaseService.subscribeList<AuditLogEntry>(
+      'auditLogs', schoolId,
       (items) => {
         setAuditLogs(items.filter((l) => l.targetUid === userId).slice(0, 20));
       },
@@ -93,13 +93,13 @@ export default function UserProfilePage() {
     setActionLoading(true);
     try {
       if (confirmAction.type === 'suspend') {
-        await RealtimeService.update(`schools/${schoolId}/users/${userData.uid}`, { status: 'suspended' });
+        await SupabaseService.update('users', userData.uid, { status: 'suspended' });
         toast.success('User suspended');
       } else if (confirmAction.type === 'activate') {
-        await RealtimeService.update(`schools/${schoolId}/users/${userData.uid}`, { status: 'active' });
+        await SupabaseService.update('users', userData.uid, { status: 'active' });
         toast.success('User activated');
       } else if (confirmAction.type === 'reset') {
-        await RealtimeService.update(`schools/${schoolId}/users/${userData.uid}`, { status: 'inactive' });
+        await SupabaseService.update('users', userData.uid, { status: 'inactive' });
         toast.success('Account reset successfully');
       }
     } catch {

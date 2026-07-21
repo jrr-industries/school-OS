@@ -150,7 +150,7 @@ export function useSubscriptionMetrics(): {
       ]);
       setPlanDistribution(plans);
 
-      const supabase = (await import('@schoolos/auth')).createClientSupabaseClient();
+      const supabase = (await import('@schoolos/auth/client')).createClientSupabaseClient();
       const thirtyDays = new Date();
       thirtyDays.setDate(thirtyDays.getDate() + 30);
       const { count } = await supabase

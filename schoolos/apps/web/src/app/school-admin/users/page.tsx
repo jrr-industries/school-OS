@@ -13,10 +13,10 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Modal
 } from '@schoolos/ui';
 import { PageHeader } from '@/features/school-admin/components/page-header';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { useRealtimeList } from '@/features/firebase/hooks/use-realtime';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
-import type { SchoolAdminUser } from '@/features/firebase/types';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { useSchoolList } from '@/features/supabase/hooks/use-school-realtime';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import type { SchoolAdminUser } from '@/features/school-admin/types';
 
 const statusConfig: Record<string, { variant: 'success' | 'warning' | 'destructive' | 'info'; label: string }> = {
   active: { variant: 'success', label: 'Active' },
@@ -60,10 +60,8 @@ type SortDir = 'asc' | 'desc';
 const PAGE_SIZE = 10;
 
 export default function UsersPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
-  const { data: users, loading: dataLoading } = useRealtimeList<SchoolAdminUser>(
-    schoolId ? `schools/${schoolId}/users` : null,
-  );
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
+  const { data: users, loading: dataLoading } = useSchoolList<SchoolAdminUser>('users', schoolId);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -141,13 +139,13 @@ export default function UsersPage() {
     const { type, user: target } = confirmAction;
     try {
       if (type === 'suspend') {
-        await RealtimeService.update(`schools/${schoolId}/users/${target.uid}`, { status: 'suspended' });
+        await SupabaseService.update('users', target.uid, { status: 'suspended' });
         toast.success('User suspended');
       } else if (type === 'activate') {
-        await RealtimeService.update(`schools/${schoolId}/users/${target.uid}`, { status: 'active' });
+        await SupabaseService.update('users', target.uid, { status: 'active' });
         toast.success('User activated');
       } else if (type === 'reset') {
-        await RealtimeService.update(`schools/${schoolId}/users/${target.uid}`, { status: 'inactive' });
+        await SupabaseService.update('users', target.uid, { status: 'inactive' });
         toast.success('Account reset successfully');
       }
     } catch {

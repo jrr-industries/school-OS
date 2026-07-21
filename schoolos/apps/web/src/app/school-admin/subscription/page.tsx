@@ -7,9 +7,9 @@ import {
   Sparkles, Shield, Clock,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
-import type { SubscriptionData, PaymentRecord } from '@/features/firebase/types';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import type { SubscriptionData, PaymentRecord } from '@/features/school-admin/types';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 
 const planColors: Record<string, string> = {
@@ -84,14 +84,14 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ cla
 }
 
 export default function SubscriptionPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribe<SubscriptionData>(
-      `schools/${schoolId}/subscription`,
+    const unsub = SupabaseService.subscribeByField<SubscriptionData>(
+      'subscription', schoolId, 'school_id', schoolId,
       (data) => {
         if (data) setSubscription(data);
         setLoading(false);

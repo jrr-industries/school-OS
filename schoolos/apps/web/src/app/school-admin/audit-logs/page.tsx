@@ -11,9 +11,9 @@ import {
 } from '@schoolos/ui';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader } from '@/features/school-admin/components/page-header';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
-import type { AuditLogEntry } from '@/features/firebase/types';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import type { AuditLogEntry } from '@/features/school-admin/types';
 
 const ACTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   create: Plus,
@@ -65,7 +65,7 @@ function AuditLogSkeleton() {
 }
 
 export default function AuditLogsPage() {
-  const { schoolId } = useFirebaseAuth();
+  const { schoolId } = useSchoolAdminAuth();
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -77,8 +77,8 @@ export default function AuditLogsPage() {
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribeList<AuditLogEntry>(
-      `schools/${schoolId}/auditLogs`,
+    const unsub = SupabaseService.subscribeList<AuditLogEntry>(
+      'auditLogs', schoolId,
       (items) => {
         setLogs(items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
         setLoading(false);

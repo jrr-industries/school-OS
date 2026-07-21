@@ -14,8 +14,8 @@ import {
 import {
   Card, CardHeader, CardTitle, CardContent, Badge, Button, cn,
 } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 
 const SAMPLE_DATA = {
@@ -133,19 +133,19 @@ function LoadingSkeleton() {
 }
 
 export default function BusManagementPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribe<any>(`schools/${schoolId}/analytics/transport`, (fbData) => {
+    const unsub = SupabaseService.subscribeByField<any>('analytics', schoolId, 'type', 'transport', (fbData) => {
       if (fbData) {
         setData(fbData);
       } else {
         setData(SAMPLE_DATA);
-        toast.info('Using sample transport data. Connect Firebase for live data.');
+        toast.info('Using sample transport data. Connect Supabase for live data.');
       }
       setLoading(false);
     });
@@ -158,7 +158,7 @@ export default function BusManagementPage() {
       if (loading) {
         setData(SAMPLE_DATA);
         setLoading(false);
-        toast.info('Using sample transport data. Connect Firebase for live data.');
+        toast.info('Using sample transport data. Connect Supabase for live data.');
       }
     }, 5000);
     return () => clearTimeout(timeout);

@@ -228,7 +228,7 @@ const navSections: NavSection[] = [
       { label: 'WhatsApp', href: '/admin/integrations/whatsapp', icon: MessageSquare },
       { label: 'Google Workspace', href: '/admin/integrations/google', icon: Chrome },
       { label: 'Microsoft 365', href: '/admin/integrations/microsoft', icon: Globe },
-      { label: 'Firebase', href: '/admin/integrations/firebase', icon: Code2 },
+      { label: 'Supabase', href: '/admin/integrations/supabase', icon: Database },
     ],
   },
   {

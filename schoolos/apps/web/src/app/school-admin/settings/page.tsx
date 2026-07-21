@@ -7,20 +7,20 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@schoolos/ui';
 import { toast } from 'sonner';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
-import type { SchoolSettings } from '@/features/firebase/types';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import type { SchoolSettings } from '@/features/school-admin/types';
 
 export default function SettingsPage() {
-  const { schoolId } = useFirebaseAuth();
+  const { schoolId } = useSchoolAdminAuth();
   const [settings, setSettings] = useState<SchoolSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribe<SchoolSettings>(
-      `schools/${schoolId}/settings`, (data) => {
+    const unsub = SupabaseService.subscribeByField<SchoolSettings>(
+      'settings', schoolId, 'school_id', schoolId, (data) => {
         if (data) setSettings(data);
         setLoading(false);
       },
@@ -32,7 +32,7 @@ export default function SettingsPage() {
     if (!schoolId || !settings) return;
     setSaving(true);
     try {
-      await RealtimeService.update(`schools/${schoolId}/settings`, {
+      await SupabaseService.update('settings', schoolId, {
         ...settings,
         updatedAt: new Date().toISOString(),
         updatedBy: schoolId,

@@ -1,3 +1,5 @@
+'use client';
+
 import { forwardRef, createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '../lib/utils';
 

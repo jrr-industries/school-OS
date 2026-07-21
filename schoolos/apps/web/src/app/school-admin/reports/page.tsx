@@ -7,7 +7,7 @@ import {
   AlertCircle, Filter,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Button, cn } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 
 const dateRanges = [
@@ -126,7 +126,7 @@ function generateCSV(data: Record<string, string>[], filename: string) {
 }
 
 export default function ReportsPage() {
-  useFirebaseAuth();
+  useSchoolAdminAuth();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [dateRange, setDateRange] = useState('month');

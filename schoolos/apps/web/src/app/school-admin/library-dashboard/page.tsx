@@ -7,8 +7,8 @@ import {
   Hash, Calendar,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -104,7 +104,7 @@ function StatCardSkeleton() {
 }
 
 export default function LibraryDashboardPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<LibraryAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error] = useState<string | null>(null);
@@ -118,8 +118,8 @@ export default function LibraryDashboardPage() {
       return;
     }
 
-    const unsub = RealtimeService.subscribe<LibraryAnalytics>(
-      `schools/${schoolId}/analytics/library`,
+    const unsub = SupabaseService.subscribeByField<LibraryAnalytics>(
+      'analytics', schoolId, 'type', 'library',
       (fetched) => {
         if (fetched) {
           setData(fetched);

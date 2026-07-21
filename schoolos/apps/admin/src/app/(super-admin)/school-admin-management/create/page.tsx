@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClientSupabaseClient } from '@schoolos/auth'
-import { SupabaseRealtime } from '@/lib/supabase-realtime'
+import { createClientSupabaseClient } from '@schoolos/auth/client'
 import {
   Card,
   CardHeader,
@@ -46,7 +45,11 @@ interface FormErrors {
 
 export default function CreateSchoolAdminPage() {
   const router = useRouter()
-  const supabase = createClientSupabaseClient()
+  const supabaseRef = useRef<ReturnType<typeof createClientSupabaseClient> | null>(null)
+  const getSupabase = useCallback(() => {
+    if (!supabaseRef.current) supabaseRef.current = createClientSupabaseClient()
+    return supabaseRef.current
+  }, [])
 
   const [schools, setSchools] = useState<School[]>([])
   const [loadingSchools, setLoadingSchools] = useState(true)
@@ -65,7 +68,7 @@ export default function CreateSchoolAdminPage() {
   useEffect(() => {
     const fetchSchools = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await getSupabase()
           .from('School')
           .select('id, name')
           .order('name')
@@ -78,7 +81,7 @@ export default function CreateSchoolAdminPage() {
       }
     }
     fetchSchools()
-  }, [supabase])
+  }, [getSupabase])
 
   const validate = (): boolean => {
     const newErrors: FormErrors = {}
@@ -118,7 +121,7 @@ export default function CreateSchoolAdminPage() {
 
     setSubmitting(true)
     try {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabase()
         .from('User')
         .insert({
           name: formData.name.trim(),

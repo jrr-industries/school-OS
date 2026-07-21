@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { Building2, Plus, Users, Pencil, Trash2 } from 'lucide-react';
 import { Card, CardContent, Button, Input, Badge } from '@schoolos/ui';
 import { toast } from 'sonner';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 
 interface Department {
   id: string;
@@ -18,7 +18,7 @@ interface Department {
 }
 
 export default function DepartmentsPage() {
-  const { schoolId } = useFirebaseAuth();
+  const { schoolId } = useSchoolAdminAuth();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -27,8 +27,8 @@ export default function DepartmentsPage() {
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribeList<Department>(
-      `schools/${schoolId}/departments`, (items) => {
+    const unsub = SupabaseService.subscribeList<Department>(
+      'departments', schoolId, (items) => {
         setDepartments(items);
         setLoading(false);
       },
@@ -49,13 +49,13 @@ export default function DepartmentsPage() {
     }
     try {
       if (editDept) {
-        await RealtimeService.update(`schools/${schoolId}/departments/${editDept.id}`, {
+        await SupabaseService.update('departments', editDept.id, {
           ...form, updatedAt: new Date().toISOString(),
         });
         toast.success('Department updated');
       } else {
-        await RealtimeService.push(`schools/${schoolId}/departments`, {
-          ...form, employeeCount: 0, status: 'active', createdAt: new Date().toISOString(),
+        await SupabaseService.insert('departments', {
+          ...form, school_id: schoolId, employeeCount: 0, status: 'active', createdAt: new Date().toISOString(),
         });
         toast.success('Department created');
       }
@@ -67,7 +67,7 @@ export default function DepartmentsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await RealtimeService.update(`schools/${schoolId}/departments/${id}`, { status: 'inactive' });
+      await SupabaseService.update('departments', id, { status: 'inactive' });
       toast.success('Department deactivated');
     } catch {
       toast.error('Failed to deactivate department');

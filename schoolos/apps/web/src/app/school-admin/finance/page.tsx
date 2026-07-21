@@ -8,8 +8,8 @@ import {
   PieChart as PieChartIcon, Wallet,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -120,7 +120,7 @@ function StatCardSkeleton() {
 }
 
 export default function FinanceDashboardPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<FinanceAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error] = useState<string | null>(null);
@@ -134,8 +134,8 @@ export default function FinanceDashboardPage() {
       return;
     }
 
-    const unsub = RealtimeService.subscribe<FinanceAnalytics>(
-      `schools/${schoolId}/analytics/finance`,
+    const unsub = SupabaseService.subscribeByField<FinanceAnalytics>(
+      'finance_analytics', schoolId, 'school_id', schoolId,
       (fetched) => {
         if (fetched) {
           setData(fetched);

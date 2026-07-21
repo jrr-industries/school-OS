@@ -24,7 +24,7 @@ import {
   Loader2,
   School,
 } from 'lucide-react';
-import { createClientSupabaseClient } from '@schoolos/auth';
+import { createClientSupabaseClient } from '@schoolos/auth/client';
 import { SupabaseRealtime } from '@/lib/supabase-realtime';
 import {
   Card,

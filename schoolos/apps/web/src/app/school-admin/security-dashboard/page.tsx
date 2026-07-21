@@ -7,8 +7,8 @@ import {
   ClipboardList, UserCheck, DoorOpen,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn, Skeleton, Button } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -131,7 +131,7 @@ const incidentStatusColors: Record<string, 'destructive' | 'warning' | 'success'
 };
 
 export default function SecurityDashboardPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<SecurityData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -140,8 +140,8 @@ export default function SecurityDashboardPage() {
   useEffect(() => {
     if (!schoolId) return;
 
-    const unsub = RealtimeService.subscribe<SecurityData>(
-      `schools/${schoolId}/analytics/security`,
+    const unsub = SupabaseService.subscribeByField<SecurityData>(
+      'security_analytics', schoolId, 'school_id', schoolId,
       (result) => {
         if (result) {
           setData(result);

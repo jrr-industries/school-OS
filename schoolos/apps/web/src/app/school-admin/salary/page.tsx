@@ -7,8 +7,8 @@ import {
   Calculator, Building2, DollarSign,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -95,7 +95,7 @@ const statusConfig = {
 };
 
 export default function SalaryDashboardPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<SalaryAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error] = useState<string | null>(null);
@@ -109,8 +109,8 @@ export default function SalaryDashboardPage() {
       return;
     }
 
-    const unsub = RealtimeService.subscribe<SalaryAnalytics>(
-      `schools/${schoolId}/analytics/salary`,
+    const unsub = SupabaseService.subscribeByField<SalaryAnalytics>(
+      'salary_analytics', schoolId, 'school_id', schoolId,
       (fetched) => {
         if (fetched) {
           setData(fetched);

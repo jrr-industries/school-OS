@@ -13,9 +13,9 @@ import {
   SelectTrigger, SelectValue, SelectContent, SelectItem
 } from '@schoolos/ui';
 import { PageHeader } from '@/features/school-admin/components/page-header';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
-import type { PrincipalData } from '@/features/firebase/types';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import type { PrincipalData } from '@/features/school-admin/types';
 
 const statusConfig: Record<string, { variant: 'success' | 'info' | 'destructive' | 'warning' | 'default'; label: string }> = {
   active: { variant: 'success', label: 'Active' },
@@ -25,7 +25,7 @@ const statusConfig: Record<string, { variant: 'success' | 'info' | 'destructive'
 };
 
 export default function PrincipalsPage() {
-  const { user, schoolId, loading: authLoading } = useFirebaseAuth();
+  const { user, schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [principals, setPrincipals] = useState<PrincipalData[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -49,7 +49,7 @@ export default function PrincipalsPage() {
   useEffect(() => {
     if (!schoolId) return;
     setLoading(true);
-    const unsub = RealtimeService.subscribeList<PrincipalData>(`schools/${schoolId}/principals`, (items) => {
+    const unsub = SupabaseService.subscribeList<PrincipalData>('principals', schoolId, (items) => {
       setPrincipals(items);
       setLoading(false);
     });
@@ -72,7 +72,7 @@ export default function PrincipalsPage() {
         createdBy: user?.uid || '',
         createdAt: new Date().toISOString(),
       };
-      await RealtimeService.push(`schools/${schoolId}/principals`, payload);
+      await SupabaseService.insert('principals', { ...payload, school_id: schoolId });
       toast.success('Principal created successfully');
       setCreateOpen(false);
       setFormName('');
@@ -91,13 +91,13 @@ export default function PrincipalsPage() {
     const { type, principal } = confirmAction;
     try {
       if (type === 'suspend') {
-        await RealtimeService.update(`schools/${schoolId}/principals/${principal.id}`, { status: 'suspended' });
+        await SupabaseService.update('principals', principal.id, { status: 'suspended' });
         toast.success('Principal suspended');
       } else if (type === 'activate') {
-        await RealtimeService.update(`schools/${schoolId}/principals/${principal.id}`, { status: 'active' });
+        await SupabaseService.update('principals', principal.id, { status: 'active' });
         toast.success('Principal activated');
       } else if (type === 'reset') {
-        await RealtimeService.update(`schools/${schoolId}/principals/${principal.id}`, { status: 'invited' });
+        await SupabaseService.update('principals', principal.id, { status: 'invited' });
         toast.success('Account reset successfully');
       }
     } catch {

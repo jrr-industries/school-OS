@@ -2,7 +2,22 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import type { SchoolAdminUser } from '../types';
+
+interface SchoolAdminUser {
+  uid: string;
+  email: string;
+  name: string;
+  photo?: string;
+  phone?: string;
+  role: 'school_admin' | 'principal' | 'vice_principal' | 'teacher' | 'office_staff' | 'accountant' | 'receptionist' | 'librarian' | 'driver' | 'security' | 'student' | 'parent';
+  status: 'active' | 'inactive' | 'suspended';
+  schoolId: string;
+  createdAt: string;
+  lastLogin?: string;
+  createdBy?: string;
+  deviceInfo?: string;
+  ipAddress?: string;
+}
 
 interface AuthSession {
   user: SchoolAdminUser | null;
@@ -10,7 +25,7 @@ interface AuthSession {
   error: string | null;
 }
 
-export function useFirebaseAuth() {
+export function useSchoolAdminAuth() {
   const [session, setSession] = useState<AuthSession>({
     user: null,
     loading: true,
@@ -47,7 +62,7 @@ export function useFirebaseAuth() {
       setSession({ user: null, loading: false, error: null });
       router.push('/login');
     } catch {
-      // silent
+
     }
   }, [router]);
 

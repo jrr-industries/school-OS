@@ -10,10 +10,10 @@ import {
 } from '@schoolos/ui';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader } from '@/features/school-admin/components/page-header';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { toast } from 'sonner';
-import type { Notification } from '@/features/firebase/types';
+import type { Notification } from '@/features/school-admin/types';
 
 const typeIcon: Record<string, React.ComponentType<{ className?: string }>> = {
   announcement: Megaphone,
@@ -75,7 +75,7 @@ function NotificationSkeleton() {
 }
 
 export default function NotificationsPage() {
-  const { schoolId } = useFirebaseAuth();
+  const { schoolId } = useSchoolAdminAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('all');
@@ -84,8 +84,8 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribeList<Notification>(
-      `schools/${schoolId}/notifications`,
+    const unsub = SupabaseService.subscribeList<Notification>(
+      'notifications', schoolId,
       (items) => {
         setNotifications(items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         setLoading(false);
@@ -105,7 +105,7 @@ export default function NotificationsPage() {
   const handleMarkRead = async (id: string) => {
     if (!schoolId) return;
     try {
-      await RealtimeService.update(`schools/${schoolId}/notifications/${id}`, { read: true });
+      await SupabaseService.update('notifications', id, { read: true });
     } catch {
       toast.error('Failed to mark as read');
     }
@@ -114,7 +114,7 @@ export default function NotificationsPage() {
   const handleArchive = async (id: string, archived: boolean) => {
     if (!schoolId) return;
     try {
-      await RealtimeService.update(`schools/${schoolId}/notifications/${id}`, { archived });
+      await SupabaseService.update('notifications', id, { archived });
       toast.success(archived ? 'Archived' : 'Restored');
     } catch {
       toast.error('Failed to update');
@@ -125,7 +125,7 @@ export default function NotificationsPage() {
     if (!deleteId || !schoolId) return;
     setDeleting(true);
     try {
-      await RealtimeService.set(`schools/${schoolId}/notifications/${deleteId}`, null);
+      await SupabaseService.delete('notifications', deleteId);
       toast.success('Notification deleted');
       setDeleteId(null);
     } catch {

@@ -13,9 +13,9 @@ import {
   Button, Badge, Card, CardContent, CardHeader, CardTitle, Modal, cn, Skeleton
 } from '@schoolos/ui';
 import { PageHeader } from '@/features/school-admin/components/page-header';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
-import type { PrincipalData, AuditLogEntry, RecentActivity } from '@/features/firebase/types';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import type { PrincipalData, AuditLogEntry, RecentActivity } from '@/features/school-admin/types';
 
 const statusConfig: Record<string, { variant: 'success' | 'info' | 'destructive' | 'warning'; label: string }> = {
   active: { variant: 'success', label: 'Active' },
@@ -26,7 +26,7 @@ const statusConfig: Record<string, { variant: 'success' | 'info' | 'destructive'
 
 export default function PrincipalDetailPage() {
   const params = useParams();
-  const { schoolId } = useFirebaseAuth();
+  const { schoolId } = useSchoolAdminAuth();
   const [principal, setPrincipal] = useState<PrincipalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,8 +44,8 @@ export default function PrincipalDetailPage() {
     setLoading(true);
     setError('');
 
-    const unsub = RealtimeService.subscribe<PrincipalData>(
-      `schools/${schoolId}/principals/${principalId}`,
+    const unsub = SupabaseService.subscribe<PrincipalData>(
+      'principals', principalId,
       (data) => {
         if (data) {
           setPrincipal(data);
@@ -57,8 +57,8 @@ export default function PrincipalDetailPage() {
       },
     );
 
-    const unsubLogins = RealtimeService.subscribeList<AuditLogEntry>(
-      `schools/${schoolId}/auditLogs`,
+    const unsubLogins = SupabaseService.subscribeList<AuditLogEntry>(
+      'auditLogs', schoolId,
       (items) => {
         setLoginHistory(
           items
@@ -68,8 +68,8 @@ export default function PrincipalDetailPage() {
       },
     );
 
-    const unsubActivity = RealtimeService.subscribeList<RecentActivity>(
-      `schools/${schoolId}/recentActivity`,
+    const unsubActivity = SupabaseService.subscribeList<RecentActivity>(
+      'recentActivity', schoolId,
       (items) => {
         setRecentActivity(
           items.filter((a) => a.user === principalId || a.target === principalId).slice(0, 10),
@@ -89,13 +89,13 @@ export default function PrincipalDetailPage() {
     setActionLoading(true);
     try {
       if (confirmAction.type === 'suspend') {
-        await RealtimeService.update(`schools/${schoolId}/principals/${principal.id}`, { status: 'suspended' });
+        await SupabaseService.update('principals', principal.id, { status: 'suspended' });
         toast.success('Principal suspended');
       } else if (confirmAction.type === 'activate') {
-        await RealtimeService.update(`schools/${schoolId}/principals/${principal.id}`, { status: 'active' });
+        await SupabaseService.update('principals', principal.id, { status: 'active' });
         toast.success('Principal activated');
       } else if (confirmAction.type === 'reset') {
-        await RealtimeService.update(`schools/${schoolId}/principals/${principal.id}`, { status: 'invited' });
+        await SupabaseService.update('principals', principal.id, { status: 'invited' });
         toast.success('Account reset successfully');
       }
     } catch {

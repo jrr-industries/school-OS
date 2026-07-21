@@ -7,8 +7,8 @@ import {
   RefreshCw, UserCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn, Skeleton, Button } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -108,7 +108,7 @@ function SummaryCard({
 }
 
 export default function HrDashboardPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<HrData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,8 +116,8 @@ export default function HrDashboardPage() {
   useEffect(() => {
     if (!schoolId) return;
 
-    const unsub = RealtimeService.subscribe<HrData>(
-      `schools/${schoolId}/analytics/hr`,
+    const unsub = SupabaseService.subscribeByField<HrData>(
+      'hr_analytics', schoolId, 'school_id', schoolId,
       (result) => {
         if (result) {
           setData(result);

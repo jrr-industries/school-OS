@@ -11,9 +11,9 @@ import {
   ArrowDownRight,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Button, cn } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
-import type { AnalyticsData } from '@/features/firebase/types';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import type { AnalyticsData } from '@/features/school-admin/types';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 
 const dateRanges = [
@@ -108,7 +108,7 @@ const chartTooltipStyle = {
 };
 
 export default function AnalyticsPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('30d');
@@ -123,7 +123,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribe<AnalyticsData>(`schools/${schoolId}/analytics`, (analytics) => {
+    const unsub = SupabaseService.subscribeByField<AnalyticsData>('analytics', schoolId, 'school_id', schoolId, (analytics) => {
       if (analytics) setData(analytics);
       setLoading(false);
     });

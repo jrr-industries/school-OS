@@ -1,4 +1,4 @@
-import { createClientSupabaseClient } from '@schoolos/auth';
+import { createClientSupabaseClient } from '@schoolos/auth/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 type TableName = 'School' | 'User' | 'Subscription' | 'AuditLog' | 'Notification' | 'Setting' | 'FeatureFlag' | 'Session' | 'ApiKey' | 'Student' | 'Employee' | 'Parent';

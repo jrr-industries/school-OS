@@ -8,12 +8,12 @@ import {
   BadgeCheck, ArrowLeft, Edit3, Building2, UserCog, Clock
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn, Button } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
-import type { SchoolData, SubscriptionData } from '@/features/firebase/types';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import type { SchoolData, SubscriptionData } from '@/features/school-admin/types';
 
 export default function SchoolOverview() {
-  const { schoolId } = useFirebaseAuth();
+  const { schoolId } = useSchoolAdminAuth();
   const [school, setSchool] = useState<SchoolData | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,13 +21,13 @@ export default function SchoolOverview() {
   useEffect(() => {
     if (!schoolId) return;
 
-    const unsubSchool = RealtimeService.subscribe<SchoolData>(`schools/${schoolId}`, (data) => {
+    const unsubSchool = SupabaseService.subscribe<SchoolData>('schools', schoolId, (data) => {
       if (data) setSchool(data);
       setLoading(false);
     });
 
-    const unsubSub = RealtimeService.subscribe<SubscriptionData>(
-      `schools/${schoolId}/subscription`, setSubscription,
+    const unsubSub = SupabaseService.subscribeByField<SubscriptionData>(
+      'subscription', schoolId, 'school_id', schoolId, setSubscription,
     );
 
     return () => { unsubSchool(); unsubSub(); };

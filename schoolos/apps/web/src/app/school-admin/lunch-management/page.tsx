@@ -15,8 +15,8 @@ import {
 import {
   Card, CardHeader, CardTitle, CardContent, Badge, Button, cn,
 } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 
 const PIE_COLORS_WASTE = ['#84cc16', '#f59e0b', '#ef4444'];
@@ -150,19 +150,19 @@ function LoadingSkeleton() {
 }
 
 export default function LunchManagementPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribe<any>(`schools/${schoolId}/analytics/lunch`, (fbData) => {
+    const unsub = SupabaseService.subscribeByField<any>('analytics', schoolId, 'type', 'lunch', (fbData) => {
       if (fbData) {
         setData(fbData);
       } else {
         setData(SAMPLE_DATA);
-        toast.info('Using sample lunch data. Connect Firebase for live data.');
+        toast.info('Using sample lunch data. Connect Supabase for live data.');
       }
       setLoading(false);
     });
@@ -175,7 +175,7 @@ export default function LunchManagementPage() {
       if (loading) {
         setData(SAMPLE_DATA);
         setLoading(false);
-        toast.info('Using sample lunch data. Connect Firebase for live data.');
+        toast.info('Using sample lunch data. Connect Supabase for live data.');
       }
     }, 5000);
     return () => clearTimeout(timeout);

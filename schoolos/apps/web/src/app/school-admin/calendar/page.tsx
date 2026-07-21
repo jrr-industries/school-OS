@@ -7,8 +7,8 @@ import {
   RefreshCw, Cake, Briefcase,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn, Skeleton, Button } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -80,7 +80,7 @@ const defaultCalendarData: CalendarData = {
 const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export default function CalendarPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<CalendarData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,8 +92,8 @@ export default function CalendarPage() {
   useEffect(() => {
     if (!schoolId) return;
 
-    const unsub = RealtimeService.subscribe<CalendarData>(
-      `schools/${schoolId}/analytics/calendar`,
+    const unsub = SupabaseService.subscribeByField<CalendarData>(
+      'calendar', schoolId, 'school_id', schoolId,
       (result) => {
         if (result) {
           setData(result);

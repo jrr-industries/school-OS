@@ -15,8 +15,8 @@ import {
 import {
   Card, CardHeader, CardTitle, CardContent, Badge, Button, cn,
 } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 
 
@@ -152,14 +152,14 @@ function LoadingSkeleton() {
 }
 
 export default function AcademicPerformancePage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribe<any>(`schools/${schoolId}/analytics/academic`, (fbData) => {
+    const unsub = SupabaseService.subscribeByField<any>('academic', schoolId, 'school_id', schoolId, (fbData) => {
       if (fbData) {
         setData(fbData);
       } else {

@@ -7,8 +7,8 @@ import {
   CheckCircle2, XCircle, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn, Skeleton, Button } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -126,7 +126,7 @@ const defaultFacilitiesData: FacilitiesData = {
 };
 
 export default function FacilitiesPage() {
-  const { schoolId, loading: authLoading } = useFirebaseAuth();
+  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<FacilitiesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,8 +134,8 @@ export default function FacilitiesPage() {
   useEffect(() => {
     if (!schoolId) return;
 
-    const unsub = RealtimeService.subscribe<FacilitiesData>(
-      `schools/${schoolId}/analytics/facilities`,
+    const unsub = SupabaseService.subscribeByField<FacilitiesData>(
+      'analytics', schoolId, 'type', 'facilities',
       (result) => {
         if (result) {
           setData(result);

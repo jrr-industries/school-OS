@@ -12,9 +12,9 @@ import {
   Monitor, Shield, BookOpen, Gauge,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn } from '@schoolos/ui';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
-import type { SchoolData, RecentActivity, Notification } from '@/features/firebase/types';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import type { SchoolData, RecentActivity, Notification } from '@/features/school-admin/types';
 import { motion } from 'framer-motion';
 
 interface StatCardProps {
@@ -70,7 +70,7 @@ function StatCard({ title, value, icon: Icon, trend, href, color, loading }: Sta
 }
 
 export default function SchoolAdminDashboard() {
-  const { user, schoolId, loading: authLoading } = useFirebaseAuth();
+  const { user, schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [schoolData, setSchoolData] = useState<SchoolData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -85,18 +85,18 @@ export default function SchoolAdminDashboard() {
   useEffect(() => {
     if (!schoolId) return;
 
-    const unsubSchool = RealtimeService.subscribe<SchoolData>(`schools/${schoolId}`, (data) => {
+    const unsubSchool = SupabaseService.subscribe<SchoolData>('schools', schoolId, (data) => {
       if (data) setSchoolData(data);
       setLoading(false);
     });
 
-    const unsubNotifs = RealtimeService.subscribeList<Notification>(
-      `schools/${schoolId}/notifications`,
+    const unsubNotifs = SupabaseService.subscribeList<Notification>(
+      'notifications', schoolId,
       (items) => setNotifications(items.filter((n) => !n.archived).slice(0, 3)),
     );
 
-    const unsubActivity = RealtimeService.subscribeList<RecentActivity>(
-      `schools/${schoolId}/recentActivity`,
+    const unsubActivity = SupabaseService.subscribeList<RecentActivity>(
+      'recentActivity', schoolId,
       (items) => setActivities(items.slice(0, 5)),
     );
 

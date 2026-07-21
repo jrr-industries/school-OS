@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { CalendarDays, Plus, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, Button, Input, Badge, cn } from '@schoolos/ui';
 import { toast } from 'sonner';
-import { useFirebaseAuth } from '@/features/firebase/hooks/use-firebase-auth';
-import { RealtimeService } from '@/features/firebase/services/realtime.service';
+import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
+import { SupabaseService } from '@/features/supabase/services/supabase.service';
 
 interface AcademicYear {
   id: string;
@@ -18,7 +18,7 @@ interface AcademicYear {
 }
 
 export default function AcademicYearsPage() {
-  const { schoolId } = useFirebaseAuth();
+  const { schoolId } = useSchoolAdminAuth();
   const [years, setYears] = useState<AcademicYear[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -26,8 +26,8 @@ export default function AcademicYearsPage() {
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = RealtimeService.subscribeList<AcademicYear>(
-      `schools/${schoolId}/academicYears`, (items) => {
+    const unsub = SupabaseService.subscribeList<AcademicYear>(
+      'academicYears', schoolId, (items) => {
         setYears(items);
         setLoading(false);
       },
@@ -41,8 +41,8 @@ export default function AcademicYearsPage() {
       return;
     }
     try {
-      await RealtimeService.push(`schools/${schoolId}/academicYears`, {
-        ...form, isCurrent: years.length === 0, status: 'active', createdAt: new Date().toISOString(),
+      await SupabaseService.insert('academicYears', {
+        ...form, school_id: schoolId, isCurrent: years.length === 0, status: 'active', createdAt: new Date().toISOString(),
       });
       toast.success('Academic year created');
       setForm({ name: '', startDate: '', endDate: '' });
@@ -56,10 +56,10 @@ export default function AcademicYearsPage() {
     try {
       for (const y of years) {
         if (y.isCurrent) {
-          await RealtimeService.update(`schools/${schoolId}/academicYears/${y.id}`, { isCurrent: false });
+          await SupabaseService.update('academicYears', y.id, { isCurrent: false });
         }
       }
-      await RealtimeService.update(`schools/${schoolId}/academicYears/${id}`, { isCurrent: true });
+      await SupabaseService.update('academicYears', id, { isCurrent: true });
       toast.success('Current year updated');
     } catch {
       toast.error('Failed to update');
