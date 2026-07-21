@@ -223,7 +223,23 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(navSections.map((s) => s.title)));
+  const [sessionInfo, setSessionInfo] = useState<{ name: string; email: string; schoolName: string } | null>(null);
   const { resolvedTheme, toggleTheme } = useThemeStore();
+
+  useEffect(() => {
+    fetch('/api/auth/session')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && d.data) {
+          setSessionInfo({
+            name: d.data.name,
+            email: d.data.email,
+            schoolName: d.data.schoolName,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -267,9 +283,9 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
         aria-label="School Admin navigation"
       >
         <div className="flex h-16 shrink-0 items-center justify-between border-b px-4 dark:border-slate-800">
-          <Link href="/school-admin/dashboard" className="flex items-center gap-2 font-bold text-lg">
-            <School className="h-6 w-6 text-primary" />
-            <span>SchoolOS</span>
+          <Link href="/school-admin/dashboard" className="flex items-center gap-2 font-bold text-lg min-w-0">
+            <School className="h-6 w-6 text-primary shrink-0" />
+            <span className="truncate">{sessionInfo?.schoolName || 'SchoolOS'}</span>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -409,10 +425,10 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
           </button>
 
           <div className="flex items-center gap-3 border-l pl-4 dark:border-slate-800">
-            <Avatar size="sm" fallback="SA" />
+            <Avatar size="sm" fallback={sessionInfo?.name?.charAt(0) || 'A'} />
             <div className="hidden sm:block">
-              <p className="text-sm font-medium">School Admin</p>
-              <p className="text-xs text-muted-foreground">admin@school.edu</p>
+              <p className="text-sm font-medium">{sessionInfo?.name || 'School Admin'}</p>
+              <p className="text-xs text-muted-foreground">{sessionInfo?.email || 'Loading...'}</p>
             </div>
           </div>
         </header>

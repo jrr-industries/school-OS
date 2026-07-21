@@ -40,6 +40,8 @@ export async function POST(request: NextRequest) {
           email: session.email,
           name: session.name,
           role: session.role,
+          schoolId: session.schoolId,
+          schoolName: session.schoolName,
         },
       },
     });

@@ -39,7 +39,7 @@ export async function middleware(request: NextRequest) {
 
   // ============================================================
   // Temporary Development Authentication
-  // Protects /admin/* routes using dev session cookie
+  // Protects /admin/* and /school-admin/* routes using dev session cookie
   // ============================================================
   if (process.env.NODE_ENV === 'development' && isAdminPath(pathname)) {
     const session = await getDevSessionFromCookies(
@@ -49,6 +49,18 @@ export async function middleware(request: NextRequest) {
     if (!session) {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    if (pathname.startsWith('/admin') && session.role !== 'SUPER_ADMIN') {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('error', 'access_denied');
+      return NextResponse.redirect(loginUrl);
+    }
+
+    if (pathname.startsWith('/school-admin') && session.role !== 'SCHOOL_ADMIN') {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('error', 'access_denied');
       return NextResponse.redirect(loginUrl);
     }
 

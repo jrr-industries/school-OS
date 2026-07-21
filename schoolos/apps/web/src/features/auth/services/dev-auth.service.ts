@@ -4,6 +4,7 @@
 // ============================================================
 
 import type { DevSession, DevLoginInput } from '../types';
+import { prisma } from '@schoolos/database';
 
 const DEV_EMAIL = 'admin@schoolos.dev';
 const DEV_PASSWORD = 'Admin@123';
@@ -16,20 +17,51 @@ export class DevAuthService {
 
     await new Promise((resolve) => setTimeout(resolve, 800));
 
-    if (input.email !== DEV_EMAIL || input.password !== DEV_PASSWORD) {
+    if (input.email === DEV_EMAIL && input.password === DEV_PASSWORD) {
+      return {
+        id: 'dev-super-admin-001',
+        email: DEV_EMAIL,
+        name: 'Super Admin',
+        role: 'SUPER_ADMIN',
+        permissions: ['*'],
+        authenticated: true,
+      };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: input.email },
+      include: {
+        userRoles: { include: { role: true } },
+        school: true,
+      },
+    });
+
+    if (!user || user.deletedAt) {
       throw new Error('Invalid email or password');
     }
 
-    const session: DevSession = {
-      id: 'dev-super-admin-001',
-      email: DEV_EMAIL,
-      name: 'Super Admin',
-      role: 'SUPER_ADMIN',
+    if (input.password !== DEV_PASSWORD) {
+      throw new Error('Invalid email or password');
+    }
+
+    const schoolAdminRole = user.userRoles.find(
+      (ur) => ur.role.slug === 'school_admin',
+    );
+
+    if (!schoolAdminRole) {
+      throw new Error('You do not have access to this platform');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: 'SCHOOL_ADMIN',
+      schoolId: user.schoolId,
+      schoolName: user.school.name,
       permissions: ['*'],
       authenticated: true,
     };
-
-    return session;
   }
 
   async getSession(): Promise<DevSession | null> {

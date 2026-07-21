@@ -5,19 +5,26 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@schoolos/ui';
 import { Eye, EyeOff, School, AlertCircle } from 'lucide-react';
 
 export default function DevLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (searchParams.get('error') === 'access_denied') {
+      setError('Access denied. You do not have permission to access that page.');
+    }
+  }, [searchParams]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,7 +46,10 @@ export default function DevLoginPage() {
         return;
       }
 
-      router.push('/admin/dashboard');
+      const redirectTo = result.data?.user?.role === 'SCHOOL_ADMIN'
+        ? '/school-admin/dashboard'
+        : '/admin/dashboard';
+      router.push(redirectTo);
     } catch {
       setError('Network error. Please try again.');
       setIsLoading(false);

@@ -3,12 +3,16 @@
 // This will be replaced with Supabase Auth / JWT in production
 // ============================================================
 
+export type UserRole = 'SUPER_ADMIN' | 'SCHOOL_ADMIN';
+
 export interface DevSession {
   id: string;
   email: string;
   name: string;
-  role: 'SUPER_ADMIN';
-  permissions: ['*'];
+  role: UserRole;
+  schoolId?: string;
+  schoolName?: string;
+  permissions: string[];
   authenticated: true;
 }
 
