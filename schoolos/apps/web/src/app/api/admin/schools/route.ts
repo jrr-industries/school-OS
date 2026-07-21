@@ -93,6 +93,11 @@ export async function POST(request: Request) {
       );
     }
 
+    const adminUserRecord = await prisma.user.findUnique({
+      where: { email: session.email },
+      select: { id: true },
+    });
+
     const school = await prisma.school.create({
       data: {
         name,
@@ -102,7 +107,7 @@ export async function POST(request: Request) {
         email: email || null,
         phone: phone || null,
         status: 'active',
-        createdBy: session.id,
+        createdBy: adminUserRecord?.id ?? undefined,
       },
     });
 
@@ -116,7 +121,7 @@ export async function POST(request: Request) {
             description: role.description,
             isSystem: role.isSystem,
             sortOrder: role.sortOrder,
-            createdBy: session.id,
+            createdBy: adminUserRecord?.id ?? undefined,
           },
         }),
       ),
@@ -134,7 +139,7 @@ export async function POST(request: Request) {
             isTeaching: des.isTeaching,
             isActive: true,
             sortOrder: des.sortOrder,
-            createdBy: session.id,
+            createdBy: adminUserRecord?.id ?? undefined,
           },
         }),
       ),
@@ -149,7 +154,7 @@ export async function POST(request: Request) {
             code: dep.code,
             description: dep.description,
             isActive: true,
-            createdBy: session.id,
+            createdBy: adminUserRecord?.id ?? undefined,
           },
         }),
       ),
@@ -164,7 +169,7 @@ export async function POST(request: Request) {
         name: adminName,
         status: 'active',
         isSuperAdmin: false,
-        createdBy: session.id,
+        createdBy: adminUserRecord?.id ?? undefined,
       },
     });
 
