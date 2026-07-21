@@ -16,7 +16,7 @@ type StudentCategory = Prisma.StudentCategoryGetPayload<{}>;
 type StudentHouse = Prisma.StudentHouseGetPayload<{}>;
 type AdmissionSource = Prisma.AdmissionSourceGetPayload<{}>;
 
-export class AcademicYearRepository extends BaseRepository<AcademicYear, Prisma.AcademicYearCreateInput, Prisma.AcademicYearUpdateInput> {
+export class AcademicYearRepository extends BaseRepository<AcademicYear, Prisma.AcademicYearUncheckedCreateInput, Prisma.AcademicYearUncheckedUpdateInput> {
   protected modelName = 'academicYear';
 
   async findCurrent(schoolId: string) {
@@ -27,7 +27,7 @@ export class AcademicYearRepository extends BaseRepository<AcademicYear, Prisma.
   }
 
   async setCurrent(id: string, schoolId: string) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       await tx.academicYear.updateMany({
         where: { schoolId, isCurrent: true },
         data: { isCurrent: false },
@@ -40,7 +40,7 @@ export class AcademicYearRepository extends BaseRepository<AcademicYear, Prisma.
   }
 }
 
-export class AcademicTermRepository extends BaseRepository<AcademicTerm, Prisma.AcademicTermCreateInput, Prisma.AcademicTermUpdateInput> {
+export class AcademicTermRepository extends BaseRepository<AcademicTerm, Prisma.AcademicTermUncheckedCreateInput, Prisma.AcademicTermUncheckedUpdateInput> {
   protected modelName = 'academicTerm';
 
   async findByAcademicYear(academicYearId: string) {
@@ -51,7 +51,7 @@ export class AcademicTermRepository extends BaseRepository<AcademicTerm, Prisma.
   }
 }
 
-export class CampusRepository extends BaseRepository<Campus, Prisma.CampusCreateInput, Prisma.CampusUpdateInput> {
+export class CampusRepository extends BaseRepository<Campus, Prisma.CampusUncheckedCreateInput, Prisma.CampusUncheckedUpdateInput> {
   protected modelName = 'campus';
 
   async findMain(schoolId: string) {
@@ -61,23 +61,23 @@ export class CampusRepository extends BaseRepository<Campus, Prisma.CampusCreate
   }
 }
 
-export class BuildingRepository extends BaseRepository<Building, Prisma.BuildingCreateInput, Prisma.BuildingUpdateInput> {
+export class BuildingRepository extends BaseRepository<Building, Prisma.BuildingUncheckedCreateInput, Prisma.BuildingUncheckedUpdateInput> {
   protected modelName = 'building';
 }
 
-export class RoomRepository extends BaseRepository<Room, Prisma.RoomCreateInput, Prisma.RoomUpdateInput> {
+export class RoomRepository extends BaseRepository<Room, Prisma.RoomUncheckedCreateInput, Prisma.RoomUncheckedUpdateInput> {
   protected modelName = 'room';
 }
 
-export class DepartmentRepository extends BaseRepository<Department, Prisma.DepartmentCreateInput, Prisma.DepartmentUpdateInput> {
+export class DepartmentRepository extends BaseRepository<Department, Prisma.DepartmentUncheckedCreateInput, Prisma.DepartmentUncheckedUpdateInput> {
   protected modelName = 'department';
 }
 
-export class SubjectGroupRepository extends BaseRepository<SubjectGroup, Prisma.SubjectGroupCreateInput, Prisma.SubjectGroupUpdateInput> {
+export class SubjectGroupRepository extends BaseRepository<SubjectGroup, Prisma.SubjectGroupUncheckedCreateInput, Prisma.SubjectGroupUncheckedUpdateInput> {
   protected modelName = 'subjectGroup';
 }
 
-export class SubjectRepository extends BaseRepository<Subject, Prisma.SubjectCreateInput, Prisma.SubjectUpdateInput> {
+export class SubjectRepository extends BaseRepository<Subject, Prisma.SubjectUncheckedCreateInput, Prisma.SubjectUncheckedUpdateInput> {
   protected modelName = 'subject';
 
   async findByDepartment(departmentId: string) {
@@ -95,7 +95,7 @@ export class SubjectRepository extends BaseRepository<Subject, Prisma.SubjectCre
   }
 }
 
-export class StudentClassRepository extends BaseRepository<StudentClass, Prisma.StudentClassCreateInput, Prisma.StudentClassUpdateInput> {
+export class StudentClassRepository extends BaseRepository<StudentClass, Prisma.StudentClassUncheckedCreateInput, Prisma.StudentClassUncheckedUpdateInput> {
   protected modelName = 'studentClass';
 
   async findByAcademicYear(academicYearId: string) {
@@ -114,7 +114,7 @@ export class StudentClassRepository extends BaseRepository<StudentClass, Prisma.
   }
 }
 
-export class SectionRepository extends BaseRepository<Section, Prisma.SectionCreateInput, Prisma.SectionUpdateInput> {
+export class SectionRepository extends BaseRepository<Section, Prisma.SectionUncheckedCreateInput, Prisma.SectionUncheckedUpdateInput> {
   protected modelName = 'section';
 
   async findByClass(classId: string) {
@@ -125,14 +125,14 @@ export class SectionRepository extends BaseRepository<Section, Prisma.SectionCre
   }
 }
 
-export class StudentCategoryRepository extends BaseRepository<StudentCategory, Prisma.StudentCategoryCreateInput, Prisma.StudentCategoryUpdateInput> {
+export class StudentCategoryRepository extends BaseRepository<StudentCategory, Prisma.StudentCategoryUncheckedCreateInput, Prisma.StudentCategoryUncheckedUpdateInput> {
   protected modelName = 'studentCategory';
 }
 
-export class StudentHouseRepository extends BaseRepository<StudentHouse, Prisma.StudentHouseCreateInput, Prisma.StudentHouseUpdateInput> {
+export class StudentHouseRepository extends BaseRepository<StudentHouse, Prisma.StudentHouseUncheckedCreateInput, Prisma.StudentHouseUncheckedUpdateInput> {
   protected modelName = 'studentHouse';
 }
 
-export class AdmissionSourceRepository extends BaseRepository<AdmissionSource, Prisma.AdmissionSourceCreateInput, Prisma.AdmissionSourceUpdateInput> {
+export class AdmissionSourceRepository extends BaseRepository<AdmissionSource, Prisma.AdmissionSourceUncheckedCreateInput, Prisma.AdmissionSourceUncheckedUpdateInput> {
   protected modelName = 'admissionSource';
 }

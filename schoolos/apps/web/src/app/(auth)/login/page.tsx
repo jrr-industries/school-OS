@@ -1,95 +1,126 @@
+// ============================================================
+// Temporary Development Authentication - Login Page
+// This will be replaced with Supabase Auth / JWT in production
+// ============================================================
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Input, Card, CardHeader, CardContent } from '@schoolos/ui';
-import { AuthService } from '@schoolos/auth';
-import { useAuthStore } from '@schoolos/hooks';
-import { loginSchema } from '@schoolos/validation';
-import { Toaster, toast } from 'sonner';
+import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@schoolos/ui';
+import { Eye, EyeOff, School, AlertCircle } from 'lucide-react';
 
-export default function LoginPage() {
+export default function DevLoginPage() {
   const router = useRouter();
-  const setUser = useAuthStore((state) => state.setUser);
-  const setTokens = useAuthStore((state) => state.setTokens);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [error, setError] = useState('');
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsLoading(true);
-    setErrors({});
-
-    const formData = new FormData(event.currentTarget);
-    const data = {
-      email: formData.get('email') as string,
-      password: formData.get('password') as string,
-    };
-
-    const validation = loginSchema.safeParse(data);
-    if (!validation.success) {
-      const fieldErrors: Record<string, string> = {};
-      for (const issue of validation.error.issues) {
-        const path = issue.path.join('.');
-        fieldErrors[path] = issue.message;
-      }
-      setErrors(fieldErrors);
-      setIsLoading(false);
-      return;
-    }
+    setError('');
 
     try {
-      const authService = new AuthService();
-      const result = await authService.login(validation.data);
+      const response = await fetch('/api/auth/dev-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, rememberMe }),
+      });
 
-      setUser(result.user);
-      setTokens(result.session.accessToken, result.session.refreshToken);
+      const result = await response.json();
 
-      toast.success('Login successful');
-      router.push('/dashboard');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Login failed');
-    } finally {
+      if (!result.success) {
+        setError(result.error ?? 'Login failed');
+        setIsLoading(false);
+        return;
+      }
+
+      router.push('/admin/dashboard');
+    } catch {
+      setError('Network error. Please try again.');
       setIsLoading(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="text-center">
-            <h1 className="text-2xl font-bold">SchoolOS</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Sign in to your account
-            </p>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4 dark:from-slate-950 dark:to-slate-900">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="space-y-1 text-center">
+          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <School className="h-6 w-6 text-primary" />
           </div>
+          <CardTitle className="text-2xl font-bold">Welcome to SchoolOS</CardTitle>
+          <CardDescription>
+            Sign in to your admin account
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
             <Input
               label="Email"
-              name="email"
               type="email"
-              placeholder="you@school.com"
-              error={errors.email}
+              placeholder="admin@schoolos.dev"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
             />
-            <Input
-              label="Password"
-              name="password"
-              type="password"
-              placeholder="Enter your password"
-              error={errors.password}
-              required
-            />
+
+            <div className="relative">
+              <Input
+                label="Password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-9 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="remember"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <label htmlFor="remember" className="text-sm text-muted-foreground cursor-pointer select-none">
+                Remember me
+              </label>
+            </div>
+
             <Button type="submit" className="w-full" isLoading={isLoading}>
               Sign In
             </Button>
           </form>
         </CardContent>
+        <CardFooter className="justify-center border-t px-6 py-4">
+          <p className="text-xs text-muted-foreground">
+            Development Mode &middot; v0.1.0
+          </p>
+        </CardFooter>
       </Card>
-      <Toaster richColors />
     </div>
   );
 }

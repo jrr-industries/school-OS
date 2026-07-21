@@ -1,8 +1,15 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'SchoolOS Admin',
-  description: 'SchoolOS Admin Dashboard',
+  title: {
+    template: '%s | SchoolOS Super Admin',
+    default: 'SchoolOS Super Admin',
+  },
+  description: 'Enterprise super admin portal for SchoolOS',
 };
 
 interface AdminLayoutProps {
@@ -11,8 +18,10 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.variable} bg-background text-foreground antialiased`}>
+        {children}
+      </body>
     </html>
   );
 }

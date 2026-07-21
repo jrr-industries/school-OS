@@ -3,8 +3,8 @@ import { prisma } from '../client';
 import { BaseRepository } from './base.repository';
 
 type School = Prisma.SchoolGetPayload<{}>;
-type CreateSchoolInput = Prisma.SchoolCreateInput;
-type UpdateSchoolInput = Prisma.SchoolUpdateInput;
+type CreateSchoolInput = Prisma.SchoolUncheckedCreateInput;
+type UpdateSchoolInput = Prisma.SchoolUncheckedUpdateInput;
 
 export class SchoolRepository extends BaseRepository<School, CreateSchoolInput, UpdateSchoolInput> {
   protected modelName = 'school';

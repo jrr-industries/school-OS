@@ -1,5 +1,4 @@
 import { prisma } from '@schoolos/database';
-import { IdUtils } from '@schoolos/utils';
 
 interface CreateSessionParams {
   userId: string;

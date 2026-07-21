@@ -2,7 +2,7 @@ import { prisma } from '@schoolos/database';
 import { createSupabaseAdminClient } from '../supabase';
 import { SessionService } from './session.service';
 import type { AuthResult, LoginParams, RegisterParams } from '../types';
-import { Logger } from '@schoolos/utils';
+import { Logger } from '@schoolos/utils/server';
 
 export class AuthService {
   private readonly sessionService: SessionService;
@@ -58,16 +58,16 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    const roles = user.userRoles.map((ur) => ur.role.slug);
-    const permissions = [
-      ...new Set(
-        user.userRoles.flatMap((ur) =>
-          ur.role.permissions.map((rp) => rp.permission.slug),
+    const roles = user.userRoles.map((ur: any) => ur.role.slug);
+    const permissions: string[] = [
+      ...new Set<string>(
+        user.userRoles.flatMap((ur: any) =>
+          ur.role.permissions.map((rp: any) => rp.permission.slug as string),
         ),
       ),
     ];
 
-    const session = await this.sessionService.createSession({
+    await this.sessionService.createSession({
       userId: user.id,
       schoolId: user.schoolId,
       token: authData.session.access_token,
@@ -97,7 +97,7 @@ export class AuthService {
   }
 
   async register(params: RegisterParams): Promise<AuthResult> {
-    const { email, password, name, schoolId, ipAddress, userAgent } = params;
+    const { email, password, name, schoolId } = params;
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -153,11 +153,11 @@ export class AuthService {
       },
     });
 
-    const roles = user.userRoles.map((ur) => ur.role.slug);
-    const permissions = [
-      ...new Set(
-        user.userRoles.flatMap((ur) =>
-          ur.role.permissions.map((rp) => rp.permission.slug),
+    const roles: string[] = user.userRoles.map((ur: any) => ur.role.slug);
+    const permissions: string[] = [
+      ...new Set<string>(
+        user.userRoles.flatMap((ur: any) =>
+          ur.role.permissions.map((rp: any) => rp.permission.slug as string),
         ),
       ),
     ];
@@ -216,11 +216,11 @@ export class AuthService {
       throw new Error('User not found');
     }
 
-    const roles = user.userRoles.map((ur) => ur.role.slug);
-    const permissions = [
-      ...new Set(
-        user.userRoles.flatMap((ur) =>
-          ur.role.permissions.map((rp) => rp.permission.slug),
+    const roles: string[] = user.userRoles.map((ur: any) => ur.role.slug);
+    const permissions: string[] = [
+      ...new Set<string>(
+        user.userRoles.flatMap((ur: any) =>
+          ur.role.permissions.map((rp: any) => rp.permission.slug as string),
         ),
       ),
     ];

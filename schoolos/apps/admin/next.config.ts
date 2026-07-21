@@ -14,7 +14,6 @@ const nextConfig: NextConfig = {
     '@schoolos/constants',
     '@schoolos/validation',
   ],
-  output: 'standalone',
 };
 
 export default nextConfig;

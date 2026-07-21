@@ -239,6 +239,8 @@ model School {
   studentCategories StudentCategory[]
   studentHouses   StudentHouse[]
   admissionSources AdmissionSource[]
+  profiles        Profile[]
+  userRoles       UserRole[]
   classes         StudentClass[]
   sections        Section[]
   students        Student[]
@@ -669,6 +671,7 @@ model AcademicYear {
   school School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   terms  AcademicTerm[]
   classes StudentClass[]
+  students Student[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -776,6 +779,7 @@ model Room {
 
   school   School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   building Building @relation(fields: [buildingId], references: [id])
+  sections Section[]
 
   @@unique([buildingId, name])
   @@index([schoolId])
@@ -957,8 +961,10 @@ model StudentClass {
   school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
   campus      Campus?      @relation(fields: [campusId], references: [id])
-  sections    Section[]
-  students    Student[]
+  sections      Section[]
+  students      Student[]
+  fromPromotions StudentPromotion[] @relation("PromotionFromClass")
+  toPromotions   StudentPromotion[] @relation("PromotionToClass")
 
   @@unique([academicYearId, name])
   @@index([schoolId])
@@ -1028,8 +1034,6 @@ model Student {
   motherTongue     String?      @map("mother_tongue") @db.VarChar(50)
   caste            String?      @db.VarChar(50)
   community        String?      @db.VarChar(50)
-  category         String?      @db.VarChar(50)
-
   aadharNumber     String?      @map("aadhar_number") @db.VarChar(20)
   passportNumber   String?      @map("passport_number") @db.VarChar(20)
   ssnNumber        String?      @map("ssn_number") @db.VarChar(20)
@@ -1080,6 +1084,7 @@ model Student {
   guardians        StudentGuardian[]
   emergencyContacts EmergencyContact[]
   previousSchools  StudentPreviousSchool[]
+  parentStudents   ParentStudent[]
   promotions       StudentPromotion[]
   transfers        StudentTransfer[]
   archives         StudentArchive[]
@@ -1349,7 +1354,9 @@ model StudentPromotion {
   updatedBy      String?         @map("updated_by") @db.Uuid
   version        Int             @default(1) @map("version")
 
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student  Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fromClass StudentClass @relation("PromotionFromClass", fields: [fromClassId], references: [id])
+  toClass   StudentClass @relation("PromotionToClass", fields: [toClassId], references: [id])
 
   @@index([studentId])
   @@index([schoolId])

@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { Logger } from '@schoolos/utils';
+import { Logger } from '@schoolos/utils/server';
 import { ApiResponse } from './response';
 import { ApiError } from './error';
 import { validateBody, validateQuery, validateParams } from './validation';
@@ -49,8 +49,6 @@ export function apiHandler(
 
       return response;
     } catch (error) {
-      const duration = Date.now() - startTime;
-
       if (error instanceof ApiError) {
         Logger.warn('API', `Request ${requestId} failed: ${error.message}`);
         return ApiResponse.error(

@@ -13,7 +13,7 @@ interface StudentDetailPageProps {
 
 export default function StudentDetailPage({ params }: StudentDetailPageProps) {
   const { id } = use(params);
-  const [student, setStudent] = useState<Record<string, unknown> | null>(null);
+  const [student, setStudent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -46,12 +46,12 @@ export default function StudentDetailPage({ params }: StudentDetailPageProps) {
     return <div className="py-12 text-center text-muted-foreground">Student not found</div>;
   }
 
-  const guardians = student.guardians as Array<Record<string, unknown>> | undefined;
-  const addresses = student.addresses as Array<Record<string, unknown>> | undefined;
-  const medical = student.medical as Record<string, unknown> | undefined;
-  const documents = student.documents as Array<Record<string, unknown>> | undefined;
-  const promotions = student.promotions as Array<Record<string, unknown>> | undefined;
-  const emergencyContacts = student.emergencyContacts as Array<Record<string, unknown>> | undefined;
+  const guardians = student.guardians as any[] | undefined;
+  const addresses = student.addresses as any[] | undefined;
+  const medical = student.medical as Record<string, any> | undefined;
+  const documents = student.documents as any[] | undefined;
+  const promotions = student.promotions as any[] | undefined;
+  const emergencyContacts = student.emergencyContacts as any[] | undefined;
 
   const timelineEvents = [
     {

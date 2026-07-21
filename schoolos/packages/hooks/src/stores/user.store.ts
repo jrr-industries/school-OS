@@ -18,7 +18,7 @@ interface UserState {
 
 export const useUserStore = create<UserState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       preferences: {
         sidebarCollapsed: false,
         language: 'en',

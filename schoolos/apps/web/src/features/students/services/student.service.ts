@@ -1,15 +1,13 @@
-import { prisma, StudentRepository, ParentRepository, AcademicYearRepository } from '@schoolos/database';
-import { Logger, IdUtils } from '@schoolos/utils';
+import { prisma, StudentRepository, AcademicYearRepository } from '@schoolos/database';
+import type { PrismaTransaction } from '@schoolos/database';
+import { Logger } from '@schoolos/utils/server';
 import type { CreateStudentInput, UpdateStudentInput, PromoteStudentInput, TransferStudentInput, ArchiveStudentInput } from '@schoolos/validation';
 import { ApiError } from '@schoolos/api';
 
 export class StudentService {
   private readonly studentRepo: StudentRepository;
-  private readonly parentRepo: ParentRepository;
-
   constructor() {
     this.studentRepo = new StudentRepository();
-    this.parentRepo = new ParentRepository();
   }
 
   async create(data: CreateStudentInput, schoolId: string, userId: string) {
@@ -20,7 +18,7 @@ export class StudentService {
 
     const student = await prisma.student.create({
       data: {
-        ...data,
+        ...(data as any),
         schoolId,
         createdBy: userId,
         dateOfBirth: new Date(data.dateOfBirth),
@@ -58,7 +56,7 @@ export class StudentService {
   }
 
   async promote(data: PromoteStudentInput, schoolId: string, userId: string) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: PrismaTransaction) => {
       for (const studentId of data.studentIds) {
         await tx.student.update({
           where: { id: studentId, schoolId },
@@ -94,7 +92,7 @@ export class StudentService {
     const student = await this.studentRepo.findById(data.studentId, schoolId);
     if (!student) throw ApiError.notFound('Student not found');
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: PrismaTransaction) => {
       await tx.student.update({
         where: { id: data.studentId },
         data: {

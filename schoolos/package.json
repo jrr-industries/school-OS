@@ -26,8 +26,7 @@
     "db:seed": "pnpm --filter @schoolos/database db:seed",
     "db:studio": "pnpm --filter @schoolos/database db:studio",
     "docker:dev": "docker compose -f docker/development/docker-compose.yml up",
-    "docker:prod": "docker compose -f docker/production/docker-compose.yml up",
-    "prepare": "husky"
+    "docker:prod": "docker compose -f docker/production/docker-compose.yml up"
   },
   "engines": {
     "node": ">=20.0.0",

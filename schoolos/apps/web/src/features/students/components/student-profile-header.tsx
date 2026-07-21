@@ -2,7 +2,7 @@
 
 import { Avatar, Badge, Button } from '@schoolos/ui';
 import { DateUtils } from '@schoolos/utils';
-import { Mail, Phone, MapPin, MoreHorizontal, Pencil, Printer, QrCode } from 'lucide-react';
+import { MoreHorizontal, Pencil, Printer, QrCode } from 'lucide-react';
 
 interface StudentProfileHeaderProps {
   student: {
@@ -33,9 +33,8 @@ const statusVariantMap: Record<string, 'success' | 'warning' | 'destructive' | '
 };
 
 export function StudentProfileHeader({ student }: StudentProfileHeaderProps) {
-  const age = DateUtils.differenceInYears(new Date(), new Date(student.dateOfBirth));
+  const age = Math.floor(DateUtils.differenceInDays(new Date(), new Date(student.dateOfBirth)) / 365.25);
   const primaryAddress = student.addresses?.[0];
-  const primaryGuardian = student.guardians?.find((g: { isPrimary?: boolean }) => g.isPrimary);
 
   return (
     <div className="rounded-lg border bg-card">

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { apiHandler, ApiResponse } from '@schoolos/api';
 import { StudentService } from '@/features/students/services/student.service';
-import { createStudentSchema, updateStudentSchema, studentQuerySchema } from '@schoolos/validation';
+import { createStudentSchema, studentQuerySchema } from '@schoolos/validation';
 
 export const GET = apiHandler(async (request: NextRequest) => {
   const url = new URL(request.url);

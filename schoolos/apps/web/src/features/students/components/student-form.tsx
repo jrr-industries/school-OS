@@ -21,7 +21,6 @@ export function StudentForm({ initialData, onSubmit, isLoading }: StudentFormPro
     register,
     handleSubmit,
     formState: { errors },
-    watch,
   } = useForm<CreateStudentInput>({
     resolver: zodResolver(createStudentSchema),
     defaultValues: initialData,

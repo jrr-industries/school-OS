@@ -3,8 +3,8 @@ import { prisma } from '../client';
 import { BaseRepository } from './base.repository';
 
 type User = Prisma.UserGetPayload<{ include: { profile: true; userRoles: { include: { role: true } } } }>;
-type CreateUserInput = Prisma.UserCreateInput;
-type UpdateUserInput = Prisma.UserUpdateInput;
+type CreateUserInput = Prisma.UserUncheckedCreateInput;
+type UpdateUserInput = Prisma.UserUncheckedUpdateInput;
 
 export class UserRepository extends BaseRepository<User, CreateUserInput, UpdateUserInput> {
   protected modelName = 'user';
@@ -35,6 +35,6 @@ export class UserRepository extends BaseRepository<User, CreateUserInput, Update
     return prisma.user.update({
       where: { id },
       data: { lastLoginAt: new Date() },
-    }) as Promise<User>;
+    }) as unknown as Promise<User>;
   }
 }

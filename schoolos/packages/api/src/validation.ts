@@ -8,7 +8,7 @@ type ValidationTarget = 'body' | 'query' | 'params';
 
 function createValidationError(
   zodError: z.ZodError,
-  target: ValidationTarget,
+  _target: ValidationTarget,
 ): Record<string, string[]> {
   const errors: Record<string, string[]> = {};
 

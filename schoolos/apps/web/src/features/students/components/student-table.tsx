@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Table, Badge, Avatar, Pagination, Button, Input } from '@schoolos/ui';
 import { Search, Plus, Download, Upload, MoreHorizontal } from 'lucide-react';
-import { useDebounce } from '@schoolos/hooks';
 import { DateUtils } from '@schoolos/utils';
 
 interface StudentTableProps {
@@ -23,24 +22,12 @@ const statusVariantMap: Record<string, 'success' | 'warning' | 'destructive' | '
   withdrawn: 'warning',
 };
 
-export function StudentTable({ schoolId }: StudentTableProps) {
-  const [page, setPage] = useState(1);
+export function StudentTable({ schoolId: _schoolId }: StudentTableProps) {
+  const [_page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('');
-  const [classId, setClassId] = useState<string>('');
-  const debouncedSearch = useDebounce(search, 300);
-
-  const queryParams = new URLSearchParams({
-    schoolId,
-    page: String(page),
-    limit: '20',
-    ...(debouncedSearch && { search: debouncedSearch }),
-    ...(status && { status }),
-    ...(classId && { classId }),
-  });
 
   const { data, isLoading } = {
-    // This would use useQuery from @tanstack/react-query in production
     data: undefined as { data: unknown[]; meta: { total: number; page: number; totalPages: number } } | undefined,
     isLoading: false,
   };
@@ -51,10 +38,10 @@ export function StudentTable({ schoolId }: StudentTableProps) {
       header: 'Student',
       render: (item: Record<string, unknown>) => (
         <div className="flex items-center gap-3">
-          <Avatar size="sm" fallback={`${item.firstName} ${item.lastName}` as string} />
+          <Avatar size="sm" fallback={`${item.firstName as string} ${item.lastName as string}`} />
           <div>
-            <Link href={`/students/${item.id}`} className="font-medium hover:underline">
-              {item.firstName} {item.lastName}
+            <Link href={`/students/${item.id as string}`} className="font-medium hover:underline">
+              {item.firstName as string} {item.lastName as string}
             </Link>
             <p className="text-xs text-muted-foreground">{item.admissionNumber as string}</p>
           </div>
@@ -78,6 +65,7 @@ export function StudentTable({ schoolId }: StudentTableProps) {
     {
       key: 'gender',
       header: 'Gender',
+      render: (item: Record<string, unknown>) => <span>{item.gender as string}</span>,
     },
     {
       key: 'status',

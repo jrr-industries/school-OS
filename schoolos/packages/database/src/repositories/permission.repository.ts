@@ -3,8 +3,8 @@ import { prisma } from '../client';
 import { BaseRepository } from './base.repository';
 
 type Permission = Prisma.PermissionGetPayload<{}>;
-type CreatePermissionInput = Prisma.PermissionCreateInput;
-type UpdatePermissionInput = Prisma.PermissionUpdateInput;
+type CreatePermissionInput = Prisma.PermissionUncheckedCreateInput;
+type UpdatePermissionInput = Prisma.PermissionUncheckedUpdateInput;
 
 export class PermissionRepository extends BaseRepository<Permission, CreatePermissionInput, UpdatePermissionInput> {
   protected modelName = 'permission';
@@ -27,6 +27,6 @@ export class PermissionRepository extends BaseRepository<Permission, CreatePermi
       where: { roleId },
       include: { permission: true },
     });
-    return rolePermissions.map((rp) => rp.permission);
+    return rolePermissions.map((rp: any) => rp.permission);
   }
 }

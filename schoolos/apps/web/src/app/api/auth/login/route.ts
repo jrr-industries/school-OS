@@ -3,7 +3,7 @@ import { apiHandler } from '@schoolos/api';
 import { AuthService } from '@schoolos/auth';
 import { loginSchema } from '@schoolos/validation';
 import { ApiResponse } from '@schoolos/api';
-import { Logger } from '@schoolos/utils';
+import { Logger } from '@schoolos/utils/server';
 
 export const POST = apiHandler(async (request: NextRequest) => {
   const body = await request.json();

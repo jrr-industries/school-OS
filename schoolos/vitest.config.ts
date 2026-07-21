@@ -35,6 +35,7 @@ export default defineConfig({
       '@schoolos/config': path.resolve(__dirname, 'packages/config/src'),
       '@schoolos/types': path.resolve(__dirname, 'packages/types/src'),
       '@schoolos/utils': path.resolve(__dirname, 'packages/utils/src'),
+      '@schoolos/utils/server': path.resolve(__dirname, 'packages/utils/src/server'),
       '@schoolos/permissions': path.resolve(__dirname, 'packages/permissions/src'),
       '@schoolos/hooks': path.resolve(__dirname, 'packages/hooks/src'),
       '@schoolos/constants': path.resolve(__dirname, 'packages/constants/src'),

@@ -17,8 +17,8 @@ type Student = Prisma.StudentGetPayload<{
   };
 }>;
 
-type CreateStudentInput = Prisma.StudentCreateInput;
-type UpdateStudentInput = Prisma.StudentUpdateInput;
+type CreateStudentInput = Prisma.StudentUncheckedCreateInput;
+type UpdateStudentInput = Prisma.StudentUncheckedUpdateInput;
 
 interface StudentFindAllParams extends FindAllParams {
   campusId?: string;
@@ -204,7 +204,7 @@ export class StudentRepository extends BaseRepository<Student, CreateStudentInpu
     reason: string,
     userId: string,
   ) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       await tx.student.updateMany({
         where: { id: { in: ids }, schoolId, deletedAt: null },
         data: {
@@ -229,7 +229,7 @@ export class StudentRepository extends BaseRepository<Student, CreateStudentInpu
   }
 
   async bulkRestore(ids: string[], schoolId: string, userId: string) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       await tx.student.updateMany({
         where: { id: { in: ids }, schoolId, deletedAt: null },
         data: {
@@ -258,6 +258,18 @@ export class StudentRepository extends BaseRepository<Student, CreateStudentInpu
         status: 'withdrawn',
         version: { increment: 1 },
       },
-    });
+      include: {
+        class: true,
+        section: true,
+        campus: true,
+        academicYear: true,
+        category: true,
+        house: true,
+        guardians: { include: { parent: true } },
+        addresses: true,
+        medical: true,
+        documents: true,
+      },
+    }) as any;
   }
 }

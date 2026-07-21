@@ -91,7 +91,7 @@ export class ApiService {
     const data = (await response.json()) as ApiResponse<T[]>;
 
     if (!data.success || data.error) {
-      throw new ApiError(response.status, data.error?.code ?? 'UNKNOWN', data.error?.message ?? 'An error occurred');
+      throw new ApiError(response.status, data.error?.code ?? 'UNKNOWN', data.error?.message ?? 'An error occurred', data.error?.details ?? null);
     }
 
     return {

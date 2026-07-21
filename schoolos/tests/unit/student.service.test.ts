@@ -30,8 +30,11 @@ vi.mock('@schoolos/database', () => ({
   })),
 }));
 
-vi.mock('@schoolos/utils', () => ({
+vi.mock('@schoolos/utils/server', () => ({
   Logger: { info: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('@schoolos/utils', () => ({
   IdUtils: { generate: vi.fn(() => 'test-id') },
 }));
 

@@ -3,8 +3,8 @@ import { prisma } from '../client';
 import { BaseRepository } from './base.repository';
 
 type Parent = Prisma.ParentGetPayload<{ include: { children: { include: { student: true } } } }>;
-type CreateParentInput = Prisma.ParentCreateInput;
-type UpdateParentInput = Prisma.ParentUpdateInput;
+type CreateParentInput = Prisma.ParentUncheckedCreateInput;
+type UpdateParentInput = Prisma.ParentUncheckedUpdateInput;
 
 export class ParentRepository extends BaseRepository<Parent, CreateParentInput, UpdateParentInput> {
   protected modelName = 'parent';

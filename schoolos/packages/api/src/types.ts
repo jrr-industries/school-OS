@@ -11,7 +11,7 @@ export interface AuthenticatedRequest extends NextRequest {
   sessionId: string;
 }
 
-export type AuthenticatedHandler<T = unknown> = (
+export type AuthenticatedHandler = (
   request: AuthenticatedRequest,
   context: { params: Record<string, string> },
 ) => Promise<Response>;

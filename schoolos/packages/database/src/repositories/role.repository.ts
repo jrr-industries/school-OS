@@ -3,8 +3,8 @@ import { prisma } from '../client';
 import { BaseRepository } from './base.repository';
 
 type Role = Prisma.RoleGetPayload<{ include: { permissions: { include: { permission: true } } } }>;
-type CreateRoleInput = Prisma.RoleCreateInput;
-type UpdateRoleInput = Prisma.RoleUpdateInput;
+type CreateRoleInput = Prisma.RoleUncheckedCreateInput;
+type UpdateRoleInput = Prisma.RoleUncheckedUpdateInput;
 
 export class RoleRepository extends BaseRepository<Role, CreateRoleInput, UpdateRoleInput> {
   protected modelName = 'role';

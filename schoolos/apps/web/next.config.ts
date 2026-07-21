@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
     '@schoolos/constants',
     '@schoolos/validation',
   ],
-  output: 'standalone',
+  // output: 'standalone', // Disabled for dev; enable for production Docker builds
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-*', 'framer-motion'],
   },
