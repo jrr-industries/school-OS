@@ -1,13 +1,22 @@
-import { forwardRef } from 'react';
+import { forwardRef, useEffect, useRef } from 'react';
 import { cn } from '../lib/utils';
 
 export interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label?: string;
+  indeterminate?: boolean;
 }
 
 export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, label, id, ...props }, ref) => {
+  ({ className, label, id, indeterminate, ...props }, ref) => {
     const checkboxId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+    const innerRef = useRef<HTMLInputElement>(null);
+    const combinedRef = ref || innerRef;
+
+    useEffect(() => {
+      if (typeof combinedRef === 'object' && combinedRef?.current) {
+        combinedRef.current.indeterminate = indeterminate ?? false;
+      }
+    }, [indeterminate, combinedRef]);
 
     return (
       <label htmlFor={checkboxId} className="flex items-center gap-2 cursor-pointer">
@@ -18,7 +27,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
             'h-4 w-4 rounded border border-input bg-background text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 accent-primary',
             className,
           )}
-          ref={ref}
+          ref={combinedRef}
           {...props}
         />
         {label && <span className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{label}</span>}

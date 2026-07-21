@@ -16,4 +16,16 @@ export { Tooltip } from './components/tooltip';
 export { Separator } from './components/separator';
 export { Skeleton } from './components/skeleton';
 export { CommandPalette } from './components/command-palette';
+export {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from './components/select';
+export {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from './components/popover';
 export { cn } from './lib/utils';

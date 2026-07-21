@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ChevronUp, ChevronDown, Check, CheckCheck, Minus } from 'lucide-react';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import { Button, Checkbox } from '@schoolos/ui';
 import { Column } from './SearchFilter';
 
@@ -38,7 +38,6 @@ export function DataTable<T>({
   data,
   keyExtractor,
   searchKey,
-  onSearch,
   sortable = true,
   defaultSortKey,
   defaultSortDirection = 'asc',
@@ -56,12 +55,7 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(defaultSortKey || null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(defaultSortDirection);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    onSearch?.(query);
-  };
+  const searchQuery = '';
 
   const handleSort = (key: string) => {
     if (!sortable) return;
@@ -155,8 +149,9 @@ export function DataTable<T>({
               {selectable && (
                 <th className="px-4 py-3 text-left" scope="col">
                   <Checkbox
-                    checked={allSelected ? true : someSelected ? 'indeterminate' : false}
-                    onCheckedChange={handleSelectAll}
+                    checked={allSelected}
+                    indeterminate={someSelected && !allSelected}
+                    onChange={handleSelectAll}
                     aria-label="Select all rows"
                   />
                 </th>
@@ -195,7 +190,7 @@ export function DataTable<T>({
                     <td className="px-4 py-3">
                       <Checkbox
                         checked={selected}
-                        onCheckedChange={() => handleSelectRow(rowKey)}
+                        onChange={() => handleSelectRow(rowKey)}
                         onClick={(e) => e.stopPropagation()}
                         aria-label={`Select row ${rowKey}`}
                       />

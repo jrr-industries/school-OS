@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@schoolos/ui';
-import { RefreshCw, AlertCircle, FileText, Plus, Search, Filter } from 'lucide-react';
+import { RefreshCw, AlertCircle, FileText, Plus } from 'lucide-react';
 
 export interface EmptyStateProps {
   title: string;

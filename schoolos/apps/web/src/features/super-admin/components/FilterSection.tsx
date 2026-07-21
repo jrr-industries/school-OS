@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Filter, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Filter, X } from 'lucide-react';
 import { Button } from '@schoolos/ui';
 
 interface FilterOption {
@@ -29,7 +29,6 @@ export function FilterSection({
   hasActiveFilters,
   className,
 }: FilterSectionProps) {
-  const [expanded, setExpanded] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const visibleFilters = showAdvanced ? filters : filters.slice(0, 4);

@@ -48,9 +48,10 @@ export function ToolbarButton({
   loading,
   className,
 }: ToolbarButtonProps) {
+  const buttonVariant = variant === 'primary' ? 'default' : variant;
   return (
     <Button
-      variant={variant}
+      variant={buttonVariant}
       onClick={onClick}
       disabled={disabled || loading}
       className={`gap-2 ${className || ''}`}

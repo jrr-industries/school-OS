@@ -1,7 +1,7 @@
 'use client';
 
 import { PageHeader, DataTable, Toolbar, ToolbarGroup, ToolbarButton } from '@/features/super-admin/components';
-import { Plus, Edit, Eye, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Eye, MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
 
 interface School {
@@ -31,11 +31,10 @@ const columns = [
   { key: 'students', header: 'Students', accessor: (row: School) => row.students.toLocaleString(), align: 'right', sortable: true },
   { key: 'teachers', header: 'Teachers', accessor: (row: School) => row.teachers, align: 'right', sortable: true },
   { key: 'subscription', header: 'Plan', accessor: (row: School) => row.subscription, sortable: true },
-  { key: 'createdAt', header: 'Created', accessor: (row: School) => new Date(row.createdAt).toLocaleDateString(), sortable: true },
+  { key: 'createdAt', header: 'Created', accessor: (row: School) => new Date(row.createdAt).toLocaleDateString('en-CA'), sortable: true },
 ];
 
 export default function SchoolsPage() {
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
 
@@ -60,11 +59,11 @@ export default function SchoolsPage() {
         data={mockSchools}
         keyExtractor={(row) => row.id}
         searchKey="name"
-        onSearch={setSearchQuery}
+        onSearch={() => {}}
         selectable
         selectedKeys={selectedKeys}
         onSelectionChange={setSelectedKeys}
-        rowActions={(row) => (
+        rowActions={() => (
           <div className="flex items-center justify-end gap-1">
             <button className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="View">
               <Eye className="h-4 w-4" />

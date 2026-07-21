@@ -1,8 +1,18 @@
 'use client';
 
-import { useState, ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Search, Filter, X, ChevronDown } from 'lucide-react';
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Popover, PopoverContent, PopoverTrigger, Checkbox } from '@schoolos/ui';
+
+export interface Column<T> {
+  key: string;
+  header: string;
+  accessor: (row: T) => ReactNode;
+  render?: (value: ReactNode, row: T) => ReactNode;
+  sortable?: boolean;
+  align?: 'left' | 'right' | 'center';
+  width?: string;
+}
 
 export interface SearchFilterProps {
   searchQuery: string;
@@ -151,7 +161,8 @@ function FilterField({ filter, value, onChange }: { filter: FilterConfig; value:
                   <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 hover:bg-accent rounded cursor-pointer">
                     <Checkbox
                       checked={Array.isArray(value) && value.includes(opt.value)}
-                      onCheckedChange={(checked) => {
+                      onChange={(e) => {
+                        const checked = e.target.checked;
                         const current = (Array.isArray(value) ? value : []) as string[];
                         onChange(checked ? [...current, opt.value] : current.filter((v) => v !== opt.value));
                       }}
