@@ -16,6 +16,7 @@ const publicPaths = [
   '/reset-password',
   '/api/auth/callback',
   '/api/auth/dev-login',
+  '/api/auth/dev-quick-login',
   '/api/health',
   '/_next/static',
   '/_next/image',

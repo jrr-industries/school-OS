@@ -125,9 +125,50 @@ export default function DevLoginPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="justify-center border-t px-6 py-4">
+        <CardFooter className="flex-col border-t px-6 py-4">
+          <div className="mb-3 grid w-full grid-cols-3 gap-2">
+            {([
+              { slug: 'super_admin', label: 'Super Admin', icon: '🛡️' },
+              { slug: 'school_admin', label: 'School Admin', icon: '🏫' },
+              { slug: 'teacher', label: 'Teacher', icon: '👨‍🏫' },
+              { slug: 'staff', label: 'Staff', icon: '👔' },
+              { slug: 'parent', label: 'Parent', icon: '👪' },
+              { slug: 'student', label: 'Student', icon: '🎓' },
+            ] as const).map((r) => (
+              <button
+                key={r.slug}
+                type="button"
+                disabled={isLoading}
+                onClick={async () => {
+                  setIsLoading(true);
+                  setError('');
+                  try {
+                    const res = await fetch('/api/auth/dev-quick-login', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ roleSlug: r.slug }),
+                    });
+                    const result = await res.json();
+                    if (!result.success) {
+                      setError(result.error ?? 'Quick login failed');
+                      setIsLoading(false);
+                      return;
+                    }
+                    router.push(result.data.redirect);
+                  } catch {
+                    setError('Quick login failed');
+                    setIsLoading(false);
+                  }
+                }}
+                className="flex flex-col items-center gap-1 rounded-md border border-dashed border-muted-foreground/30 p-2 text-xs hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
+              >
+                <span className="text-base">{r.icon}</span>
+                <span className="font-medium">{r.label}</span>
+              </button>
+            ))}
+          </div>
           <p className="text-xs text-muted-foreground">
-            Development Mode &middot; v0.1.0
+            Dev Mode &middot; Click a role to instantly log in
           </p>
         </CardFooter>
       </Card>
