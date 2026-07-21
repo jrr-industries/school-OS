@@ -265,19 +265,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(navSections.map((s) => s.title)));
   const { resolvedTheme, toggleTheme } = useThemeStore();
-
-  // Auto-expand section containing current route
-  useEffect(() => {
-    const newExpanded = new Set<string>();
-    for (const section of navSections) {
-      if (section.items.some((item) => pathname?.startsWith(item.href))) {
-        newExpanded.add(section.title);
-      }
-    }
-    setExpandedSections(newExpanded);
-  }, [pathname]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -318,7 +307,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 ease-in-out dark:border-slate-800 dark:bg-slate-900 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:relative lg:translate-x-0`}
+        } lg:translate-x-0`}
         aria-label="Main navigation"
       >
         {/* Logo */}
@@ -455,7 +444,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main content */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col lg:pl-64">
         {/* Top bar */}
         <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 px-4 lg:px-6 dark:border-slate-800 dark:bg-slate-900/95">
           <button

@@ -6,7 +6,7 @@ generator client {
 datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
-  directUrl  = env("DIRECT_DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
   extensions = [citext, pgcrypto]
 }
 
@@ -241,6 +241,11 @@ model School {
   admissionSources AdmissionSource[]
   profiles        Profile[]
   userRoles       UserRole[]
+  designations    Designation[]
+  employees       Employee[]
+  employeeDocuments EmployeeDocument[]
+  employeeAddresses EmployeeAddress[]
+  employeeEmergencyContacts EmployeeEmergencyContact[]
   classes         StudentClass[]
   sections        Section[]
   students        Student[]
@@ -332,6 +337,7 @@ model User {
   sessions      Session[]
   auditLogs     AuditLog[]
   notifications Notification[]
+  employee      Employee?
 
   @@index([schoolId])
   @@index([email])
@@ -802,8 +808,10 @@ model Department {
   updatedBy   String?  @map("updated_by") @db.Uuid
   version     Int      @default(1) @map("version")
 
-  school   School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  subjects Subject[]
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subjects     Subject[]
+  designations Designation[]
+  employees    Employee[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -1412,4 +1420,195 @@ model StudentArchive {
   @@index([schoolId])
   @@index([archivedAt])
   @@map("student_archives")
+}
+
+// ============================================================
+// STAFF / EMPLOYEE MANAGEMENT
+// ============================================================
+
+enum EmployeeStatus {
+  active
+  inactive
+  suspended
+  resigned
+  terminated
+}
+
+enum EmploymentType {
+  full_time
+  part_time
+  contract
+  temporary
+  intern
+  volunteer
+}
+
+model Designation {
+  id            String   @id @default(uuid()) @db.Uuid
+  schoolId      String   @map("school_id") @db.Uuid
+  title         String   @db.VarChar(200)
+  slug          String   @db.VarChar(100)
+  description   String?  @db.Text
+  departmentId  String?  @map("department_id") @db.Uuid
+  hierarchyLevel Int     @default(0) @map("hierarchy_level")
+  isTeaching     Boolean @default(false) @map("is_teaching")
+  isActive       Boolean @default(true) @map("is_active")
+  sortOrder      Int     @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+  createdBy      String?  @map("created_by") @db.Uuid
+  updatedBy      String?  @map("updated_by") @db.Uuid
+  version        Int      @default(1) @map("version")
+
+  school     School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id])
+  employees  Employee[]
+
+  @@unique([schoolId, slug])
+  @@index([schoolId])
+  @@index([departmentId])
+  @@map("designations")
+}
+
+model Employee {
+  id              String         @id @default(uuid()) @db.Uuid
+  schoolId        String         @map("school_id") @db.Uuid
+  userId          String?        @unique @map("user_id") @db.Uuid
+  designationId   String         @map("designation_id") @db.Uuid
+  departmentId    String?        @map("department_id") @db.Uuid
+
+  employeeId      String         @unique @map("employee_id") @db.VarChar(50)
+  firstName       String         @map("first_name") @db.VarChar(100)
+  middleName      String?        @map("middle_name") @db.VarChar(100)
+  lastName        String         @map("last_name") @db.VarChar(100)
+  email           String?        @db.VarChar(200)
+  phone           String?        @db.VarChar(20)
+  alternatePhone  String?        @map("alternate_phone") @db.VarChar(20)
+
+  gender          Gender?
+  dateOfBirth     DateTime?      @map("date_of_birth")
+  bloodGroup      BloodGroup?    @map("blood_group")
+  photo           String?        @db.Text
+  signature       String?        @db.Text
+
+  qualification   String?        @db.Text
+  experience      Int?           @default(0)
+  joiningDate     DateTime?      @map("joining_date")
+  leavingDate     DateTime?      @map("leaving_date")
+  leavingReason   String?        @map("leaving_reason") @db.Text
+
+  employmentType  EmploymentType @default(full_time) @map("employment_type")
+  status          EmployeeStatus @default(active)
+  isClassTeacher  Boolean        @default(false) @map("is_class_teacher")
+
+  emergencyContact Json?         @default("{}") @map("emergency_contact")
+
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  deletedAt       DateTime?      @map("deleted_at")
+  createdBy       String?        @map("created_by") @db.Uuid
+  updatedBy       String?        @map("updated_by") @db.Uuid
+  version         Int            @default(1) @map("version")
+
+  school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user        User?        @relation(fields: [userId], references: [id])
+  designation Designation  @relation(fields: [designationId], references: [id])
+  department  Department?  @relation(fields: [departmentId], references: [id])
+
+  documents    EmployeeDocument[]
+  addresses    EmployeeAddress[]
+  emergencyContacts EmployeeEmergencyContact[]
+
+  @@index([schoolId])
+  @@index([designationId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([firstName, lastName])
+  @@map("employees")
+}
+
+model EmployeeDocument {
+  id          String   @id @default(uuid()) @db.Uuid
+  employeeId  String   @map("employee_id") @db.Uuid
+  schoolId    String   @map("school_id") @db.Uuid
+  category    DocumentCategory
+  title       String   @db.VarChar(200)
+  description String?  @db.Text
+  fileId      String?  @map("file_id") @db.Uuid
+  fileUrl     String?  @map("file_url") @db.Text
+  mimeType    String?  @db.VarChar(100)
+  fileSize    Int?     @map("file_size")
+  isVerified  Boolean  @default(false) @map("is_verified")
+  verifiedBy  String?  @map("verified_by") @db.Uuid
+  verifiedAt  DateTime? @map("verified_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedBy   String?  @map("updated_by") @db.Uuid
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  school   School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([schoolId])
+  @@index([category])
+  @@map("employee_documents")
+}
+
+model EmployeeAddress {
+  id           String      @id @default(uuid()) @db.Uuid
+  employeeId   String      @map("employee_id") @db.Uuid
+  schoolId     String      @map("school_id") @db.Uuid
+  type         AddressType
+  addressLine1 String      @map("address_line1") @db.Text
+  addressLine2 String?     @map("address_line2") @db.Text
+  city         String      @db.VarChar(100)
+  state        String      @db.VarChar(100)
+  district     String?     @db.VarChar(100)
+  country      String      @db.VarChar(100)
+  postalCode   String      @map("postal_code") @db.VarChar(20)
+  landmark     String?     @db.Text
+  isCurrent    Boolean     @default(true) @map("is_current")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  deletedAt    DateTime?   @map("deleted_at")
+  createdBy    String?     @map("created_by") @db.Uuid
+  updatedBy    String?     @map("updated_by") @db.Uuid
+  version      Int         @default(1) @map("version")
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  school   School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, type])
+  @@index([employeeId])
+  @@index([schoolId])
+  @@map("employee_addresses")
+}
+
+model EmployeeEmergencyContact {
+  id             String   @id @default(uuid()) @db.Uuid
+  employeeId     String   @map("employee_id") @db.Uuid
+  schoolId       String   @map("school_id") @db.Uuid
+  name           String   @db.VarChar(200)
+  relationship   String   @db.VarChar(50)
+  phone          String   @db.VarChar(20)
+  alternatePhone String?  @map("alternate_phone") @db.VarChar(20)
+  email          String?  @db.VarChar(200)
+  address        String?  @db.Text
+  priority       Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+  createdBy      String?  @map("created_by") @db.Uuid
+  updatedBy      String?  @map("updated_by") @db.Uuid
+  version        Int      @default(1) @map("version")
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  school   School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([schoolId])
+  @@map("employee_emergency_contacts")
 }

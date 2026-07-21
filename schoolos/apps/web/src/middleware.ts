@@ -22,7 +22,7 @@ const publicPaths = [
   '/favicon.ico',
 ];
 
-const adminPaths = ['/admin'];
+const adminPaths = ['/admin', '/school-admin'];
 
 function isPublicPath(pathname: string): boolean {
   return publicPaths.some(
