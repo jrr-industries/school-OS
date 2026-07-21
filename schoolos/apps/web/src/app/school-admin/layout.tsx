@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   LayoutDashboard, School, UserCog, Users, Settings, Building2,
@@ -13,6 +13,7 @@ import {
   ChefHat
 } from 'lucide-react';
 import { Avatar, cn } from '@schoolos/ui';
+import { SchoolAdminAuthProvider, useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
 
 interface NavItem {
   label: string;
@@ -188,32 +189,21 @@ const navSections: NavSection[] = [
 ];
 
 export default function SchoolAdminLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
+  return (
+    <SchoolAdminAuthProvider>
+      <SchoolAdminLayoutInner>{children}</SchoolAdminLayoutInner>
+    </SchoolAdminAuthProvider>
+  );
+}
+
+function SchoolAdminLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user, logout: authLogout } = useSchoolAdminAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set([
     'Dashboard', 'School Overview', 'Principal', 'Users'
   ]));
-  const [sessionInfo, setSessionInfo] = useState<{
-    name: string; email: string; schoolName: string; photo?: string;
-  } | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  useEffect(() => {
-    fetch('/api/auth/session')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.success && d.data) {
-          setSessionInfo({
-            name: d.data.name || d.data.displayName,
-            email: d.data.email,
-            schoolName: d.data.schoolName || 'SchoolOS',
-            photo: d.data.photo,
-          });
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
@@ -244,11 +234,6 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
 
   const isActive = (href: string) =>
     pathname === href || (pathname?.startsWith(href + '/'));
-
-  const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    router.push('/login');
-  };
 
   const SidebarLink = ({ item: { label, href, icon: Icon, badge } }: { item: NavItem }) => {
     const active = isActive(href);
@@ -296,7 +281,7 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
           </div>
           <div className="min-w-0 flex-1">
             <Link href="/school-admin/dashboard" className="block truncate text-sm font-bold">
-              {sessionInfo?.schoolName || 'SchoolOS'}
+              {user?.name || 'SchoolOS'}
             </Link>
             <p className="truncate text-[10px] text-muted-foreground">School Admin</p>
           </div>
@@ -362,7 +347,7 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
             Profile
           </Link>
           <button
-            onClick={handleLogout}
+            onClick={authLogout}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20 transition-colors"
           >
             <LogOut className="h-4 w-4 shrink-0" />
@@ -392,15 +377,15 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
           </button>
 
           <div className="flex items-center gap-3 border-l pl-4 dark:border-slate-800">
-            <Avatar size="sm" src={sessionInfo?.photo} fallback={sessionInfo?.name?.charAt(0) || 'A'} />
+            <Avatar size="sm" src={user?.photo} fallback={user?.name?.charAt(0) || 'A'} />
             <div className="hidden sm:block">
-              <p className="text-sm font-medium leading-tight">{sessionInfo?.name || 'School Admin'}</p>
-              <p className="text-xs text-muted-foreground">{sessionInfo?.email || ''}</p>
+              <p className="text-sm font-medium leading-tight">{user?.name || 'School Admin'}</p>
+              <p className="text-xs text-muted-foreground">{user?.email || ''}</p>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-6 animate-in fade-in slide-in-from-top-1 duration-500">
+        <main className="flex-1 p-4 lg:p-6">
           {children}
         </main>
       </div>
