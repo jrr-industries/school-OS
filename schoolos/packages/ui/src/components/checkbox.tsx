@@ -1,3 +1,5 @@
+'use client';
+
 import { forwardRef, useEffect, useRef } from 'react';
 import { cn } from '../lib/utils';
 

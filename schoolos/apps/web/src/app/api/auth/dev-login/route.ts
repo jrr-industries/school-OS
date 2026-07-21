@@ -8,6 +8,13 @@ import type { NextRequest } from 'next/server';
 import { DevAuthService } from '@/features/auth/services/dev-auth.service';
 import { createDevSession } from '@/lib/dev-session';
 
+export async function HEAD() {
+  if (process.env.NODE_ENV !== 'development') {
+    return new Response(null, { status: 403 });
+  }
+  return new Response(null, { status: 200 });
+}
+
 export async function POST(request: NextRequest) {
   if (process.env.NODE_ENV !== 'development') {
     return NextResponse.json(

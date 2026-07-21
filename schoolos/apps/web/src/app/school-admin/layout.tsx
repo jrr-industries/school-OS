@@ -1,29 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
-  LayoutDashboard, Users, GraduationCap, HeartHandshake,
-  Briefcase, BookOpen, ClipboardCheck, CalendarClock, FileEdit,
-  ClipboardList, Trophy, IndianRupee, Calculator,
-  Bus, Library, Building2, Package, MessageSquare,
-  BarChart3, LineChart, Settings, LogOut,
-  School, ChevronDown, ChevronRight, Menu, X, Sun, Moon,
-  UserCircle, Monitor, FileSpreadsheet, Notebook,
-  UserCheck, UserCog, Route, UserPlus, UserRoundCog,
-  BedDouble
+  LayoutDashboard, School, UserCog, Users, Settings, Building2,
+  CalendarDays, BookOpen, ClipboardCheck, IndianRupee, Bus,
+  MessageSquare, Bell, ScrollText, BarChart3, CreditCard,
+  UserCircle, LogOut, Sun, Moon, Menu, X, ChevronDown, ChevronRight,
+  BookMarked, FileSpreadsheet, Trophy, Wallet, PiggyBank,
+  Library, Monitor, Shield, Calendar, HeartPulse, Truck,
+  ChefHat
 } from 'lucide-react';
-import { Avatar } from '@schoolos/ui';
-import { useThemeStore } from '@schoolos/hooks';
-import { cn } from '@schoolos/ui';
+import { Avatar, cn } from '@schoolos/ui';
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  permission?: string;
-  children?: NavItem[];
+  badge?: string;
 }
 
 interface NavSection {
@@ -39,182 +34,156 @@ const navSections: NavSection[] = [
     items: [{ label: 'Overview', href: '/school-admin/dashboard', icon: LayoutDashboard }],
   },
   {
-    title: 'Admissions',
-    icon: ClipboardCheck,
+    title: 'School Overview',
+    icon: School,
+    items: [{ label: 'School Info', href: '/school-admin/overview', icon: School }],
+  },
+  {
+    title: 'Principal',
+    icon: UserCog,
+    items: [{ label: 'Manage Principal', href: '/school-admin/principals', icon: UserCog }],
+  },
+  {
+    title: 'Users',
+    icon: Users,
     items: [
-      { label: 'All Admissions', href: '/school-admin/admissions', icon: ClipboardCheck },
-      { label: 'Pending', href: '/school-admin/admissions/pending', icon: ClipboardList },
+      { label: 'All Users', href: '/school-admin/users', icon: Users },
+      { label: 'User Profile', href: '/school-admin/users/profile', icon: UserCircle },
     ],
   },
   {
-    title: 'Students',
-    icon: GraduationCap,
-    items: [
-      { label: 'All Students', href: '/school-admin/students', icon: Users },
-      { label: 'Add New', href: '/school-admin/students/new', icon: UserPlus },
-      { label: 'Promotions', href: '/school-admin/students/promotions', icon: UserCheck },
-      { label: 'Transfers', href: '/school-admin/students/transfers', icon: Route },
-    ],
+    title: 'School Settings',
+    icon: Settings,
+    items: [{ label: 'Settings', href: '/school-admin/settings', icon: Settings }],
   },
   {
-    title: 'Parents',
-    icon: HeartHandshake,
-    items: [
-      { label: 'All Parents', href: '/school-admin/parents', icon: Users },
-      { label: 'Guardians', href: '/school-admin/parents/guardians', icon: UserCog },
-    ],
+    title: 'Departments',
+    icon: Building2,
+    items: [{ label: 'Departments', href: '/school-admin/departments', icon: Building2 }],
   },
   {
-    title: 'Staff Management',
-    icon: Briefcase,
-    items: [
-      { label: 'All Staff', href: '/school-admin/staff', icon: Users },
-      { label: 'Add Staff', href: '/school-admin/staff/create', icon: UserPlus },
-      { label: 'Teachers', href: '/school-admin/teachers', icon: Monitor },
-      { label: 'Principals', href: '/school-admin/principals', icon: UserRoundCog },
-      { label: 'HR', href: '/school-admin/hr', icon: Users },
-      { label: 'Accountants', href: '/school-admin/accountants', icon: Calculator },
-      { label: 'Librarians', href: '/school-admin/librarians', icon: Library },
-      { label: 'Transport', href: '/school-admin/transport-staff', icon: Bus },
-      { label: 'Hostel', href: '/school-admin/hostel-staff', icon: BedDouble },
-    ],
+    title: 'Academic Years',
+    icon: CalendarDays,
+    items: [{ label: 'Academic Years', href: '/school-admin/academic-years', icon: CalendarDays }],
   },
   {
-    title: 'Academic',
+    title: 'Classes',
     icon: BookOpen,
-    items: [
-      { label: 'Academic Years', href: '/school-admin/academics/years', icon: BookOpen },
-      { label: 'Classes', href: '/school-admin/classes', icon: Notebook },
-      { label: 'Sections', href: '/school-admin/sections', icon: Notebook },
-      { label: 'Subjects', href: '/school-admin/subjects', icon: FileEdit },
-      { label: 'Class Teachers', href: '/school-admin/academics/class-teachers', icon: UserCog },
-    ],
+    items: [{ label: 'View Classes', href: '/school-admin/classes', icon: BookOpen, badge: 'View Only' }],
+  },
+  {
+    title: 'Subjects',
+    icon: BookMarked,
+    items: [{ label: 'View Subjects', href: '/school-admin/subjects', icon: BookMarked, badge: 'View Only' }],
   },
   {
     title: 'Attendance',
     icon: ClipboardCheck,
-    items: [
-      { label: 'Mark Attendance', href: '/school-admin/attendance', icon: ClipboardCheck },
-      { label: 'Reports', href: '/school-admin/attendance/reports', icon: BarChart3 },
-    ],
+    items: [{ label: 'View Attendance', href: '/school-admin/attendance', icon: ClipboardCheck, badge: 'View Only' }],
   },
   {
-    title: 'Timetable',
-    icon: CalendarClock,
-    items: [
-      { label: 'Class Timetable', href: '/school-admin/timetable', icon: CalendarClock },
-      { label: 'Teacher Schedule', href: '/school-admin/timetable/teachers', icon: Monitor },
-      { label: 'Room Allocation', href: '/school-admin/timetable/rooms', icon: Building2 },
-    ],
-  },
-  {
-    title: 'Homework',
-    icon: FileEdit,
-    items: [
-      { label: 'All Homework', href: '/school-admin/homework', icon: FileEdit },
-      { label: 'Pending Review', href: '/school-admin/homework/pending', icon: ClipboardList },
-    ],
-  },
-  {
-    title: 'Assignments',
-    icon: ClipboardList,
-    items: [
-      { label: 'All Assignments', href: '/school-admin/assignments', icon: ClipboardList },
-      { label: 'Submissions', href: '/school-admin/assignments/submissions', icon: FileEdit },
-    ],
-  },
-  {
-    title: 'Examinations',
-    icon: Trophy,
-    items: [
-      { label: 'Exam Schedule', href: '/school-admin/examinations', icon: FileSpreadsheet },
-      { label: 'Results', href: '/school-admin/results', icon: Trophy },
-      { label: 'Grade Cards', href: '/school-admin/examinations/grade-cards', icon: FileEdit },
-    ],
-  },
-  {
-    title: 'Fees',
+    title: 'Fee Reports',
     icon: IndianRupee,
     items: [
-      { label: 'Fee Structure', href: '/school-admin/fees', icon: IndianRupee },
-      { label: 'Collections', href: '/school-admin/fees/collections', icon: Calculator },
-      { label: 'Pending Fees', href: '/school-admin/fees/pending', icon: ClipboardList },
-      { label: 'Fee Reports', href: '/school-admin/fees/reports', icon: BarChart3 },
+      { label: 'Fee Collection', href: '/school-admin/fee-reports', icon: IndianRupee },
+      { label: 'Pending Fees', href: '/school-admin/fee-reports/pending', icon: FileSpreadsheet },
     ],
   },
   {
-    title: 'Accounting',
-    icon: Calculator,
-    items: [
-      { label: 'Income', href: '/school-admin/accounting/income', icon: IndianRupee },
-      { label: 'Expenses', href: '/school-admin/accounting/expenses', icon: Calculator },
-      { label: 'Ledger', href: '/school-admin/accounting/ledger', icon: BookOpen },
-    ],
-  },
-  {
-    title: 'Library',
-    icon: Library,
-    items: [
-      { label: 'Books', href: '/school-admin/library', icon: Library },
-      { label: 'Issue/Return', href: '/school-admin/library/issue-return', icon: ClipboardCheck },
-      { label: 'Library Reports', href: '/school-admin/library/reports', icon: BarChart3 },
-    ],
-  },
-  {
-    title: 'Transport',
+    title: 'Transport Reports',
     icon: Bus,
     items: [
-      { label: 'Routes', href: '/school-admin/transport', icon: Bus },
-      { label: 'Vehicles', href: '/school-admin/transport/vehicles', icon: Bus },
-      { label: 'Drivers', href: '/school-admin/transport/drivers', icon: Users },
-      { label: 'Student Stops', href: '/school-admin/transport/stops', icon: Route },
-    ],
-  },
-  {
-    title: 'Hostel',
-    icon: Building2,
-    items: [
-      { label: 'Rooms', href: '/school-admin/hostel', icon: Building2 },
-      { label: 'Residents', href: '/school-admin/hostel/residents', icon: Users },
-      { label: 'Facilities', href: '/school-admin/hostel/facilities', icon: BedDouble },
-    ],
-  },
-  {
-    title: 'Inventory',
-    icon: Package,
-    items: [
-      { label: 'All Items', href: '/school-admin/inventory', icon: Package },
-      { label: 'Stock Alerts', href: '/school-admin/inventory/alerts', icon: ClipboardList },
-      { label: 'Purchase Orders', href: '/school-admin/inventory/purchases', icon: FileEdit },
+      { label: 'Transport', href: '/school-admin/transport-reports', icon: Bus },
     ],
   },
   {
     title: 'Communication',
     icon: MessageSquare,
     items: [
-      { label: 'Messages', href: '/school-admin/communication', icon: MessageSquare },
-      { label: 'Announcements', href: '/school-admin/communication/announcements', icon: MessageSquare },
-      { label: 'Notifications', href: '/school-admin/communication/notifications', icon: MessageSquare },
+      { label: 'Broadcast', href: '/school-admin/communication', icon: MessageSquare },
     ],
   },
   {
-    title: 'Reports',
+    title: 'Notifications',
+    icon: Bell,
+    items: [{ label: 'All Notifications', href: '/school-admin/notifications', icon: Bell }],
+  },
+  {
+    title: 'Audit Logs',
+    icon: ScrollText,
+    items: [{ label: 'Audit Trail', href: '/school-admin/audit-logs', icon: ScrollText }],
+  },
+  {
+    title: 'Academic Performance',
+    icon: Trophy,
+    items: [{ label: 'Performance', href: '/school-admin/academic-performance', icon: Trophy }],
+  },
+  {
+    title: 'Sports',
+    icon: HeartPulse,
+    items: [{ label: 'Sports Dashboard', href: '/school-admin/sports', icon: HeartPulse }],
+  },
+  {
+    title: 'School Bus',
+    icon: Truck,
+    items: [{ label: 'Bus Management', href: '/school-admin/bus-management', icon: Truck }],
+  },
+  {
+    title: 'Lunch Management',
+    icon: ChefHat,
+    items: [{ label: 'Lunch Dashboard', href: '/school-admin/lunch-management', icon: ChefHat }],
+  },
+  {
+    title: 'Fee Dashboard',
+    icon: Wallet,
+    items: [{ label: 'Fee Overview', href: '/school-admin/fee-dashboard', icon: Wallet }],
+  },
+  {
+    title: 'Salary',
+    icon: PiggyBank,
+    items: [{ label: 'Payroll', href: '/school-admin/salary', icon: PiggyBank }],
+  },
+  {
+    title: 'Finance',
     icon: BarChart3,
-    items: [
-      { label: 'Student Reports', href: '/school-admin/reports/students', icon: Users },
-      { label: 'Staff Reports', href: '/school-admin/reports/staff', icon: Briefcase },
-      { label: 'Financial Reports', href: '/school-admin/reports/financial', icon: IndianRupee },
-      { label: 'Academic Reports', href: '/school-admin/reports/academic', icon: BookOpen },
-      { label: 'Attendance Reports', href: '/school-admin/reports/attendance', icon: ClipboardCheck },
-    ],
+    items: [{ label: 'Finance', href: '/school-admin/finance', icon: BarChart3 }],
+  },
+  {
+    title: 'Library',
+    icon: Library,
+    items: [{ label: 'Library', href: '/school-admin/library-dashboard', icon: Library }],
+  },
+  {
+    title: 'Facilities',
+    icon: Monitor,
+    items: [{ label: 'Facilities', href: '/school-admin/facilities', icon: Monitor }],
+  },
+  {
+    title: 'HR',
+    icon: Users,
+    items: [{ label: 'HR Dashboard', href: '/school-admin/hr-dashboard', icon: Users }],
+  },
+  {
+    title: 'Security',
+    icon: Shield,
+    items: [{ label: 'Security', href: '/school-admin/security-dashboard', icon: Shield }],
+  },
+  {
+    title: 'Calendar',
+    icon: Calendar,
+    items: [{ label: 'Calendar', href: '/school-admin/calendar', icon: Calendar }],
   },
   {
     title: 'Analytics',
-    icon: LineChart,
+    icon: BarChart3,
     items: [
-      { label: 'School Analytics', href: '/school-admin/analytics', icon: LineChart },
-      { label: 'Performance', href: '/school-admin/analytics/performance', icon: BarChart3 },
+      { label: 'Analytics', href: '/school-admin/analytics', icon: BarChart3 },
     ],
+  },
+  {
+    title: 'Subscription',
+    icon: CreditCard,
+    items: [{ label: 'Subscription', href: '/school-admin/subscription', icon: CreditCard }],
   },
 ];
 
@@ -222,9 +191,13 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(navSections.map((s) => s.title)));
-  const [sessionInfo, setSessionInfo] = useState<{ name: string; email: string; schoolName: string } | null>(null);
-  const { resolvedTheme, toggleTheme } = useThemeStore();
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set([
+    'Dashboard', 'School Overview', 'Principal', 'Users'
+  ]));
+  const [sessionInfo, setSessionInfo] = useState<{
+    name: string; email: string; schoolName: string; photo?: string;
+  } | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
     fetch('/api/auth/session')
@@ -232,9 +205,10 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
       .then((d) => {
         if (d.success && d.data) {
           setSessionInfo({
-            name: d.data.name,
+            name: d.data.name || d.data.displayName,
             email: d.data.email,
-            schoolName: d.data.schoolName,
+            schoolName: d.data.schoolName || 'SchoolOS',
+            photo: d.data.photo,
           });
         }
       })
@@ -242,10 +216,22 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
   }, []);
 
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(resolvedTheme);
-  }, [resolvedTheme]);
+    const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    const preferred = saved || (window.matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
+    setTheme(preferred);
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(preferred);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', next);
+      document.documentElement.classList.remove('light', 'dark');
+      document.documentElement.classList.add(next);
+      return next;
+    });
+  }, []);
 
   const toggleSection = (title: string) => {
     setExpandedSections((prev) => {
@@ -256,20 +242,42 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
     });
   };
 
-  const isActive = (href: string) => {
-    return pathname === href || (href !== '/school-admin/dashboard' && pathname?.startsWith(href + '/'));
-  };
+  const isActive = (href: string) =>
+    pathname === href || (pathname?.startsWith(href + '/'));
 
   const handleLogout = async () => {
-    await fetch('/api/auth/dev-logout', { method: 'POST' });
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     router.push('/login');
+  };
+
+  const SidebarLink = ({ item: { label, href, icon: Icon, badge } }: { item: NavItem }) => {
+    const active = isActive(href);
+    return (
+      <Link
+        href={href}
+        className={cn(
+          'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+          active
+            ? 'bg-primary/10 text-primary shadow-sm'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50',
+        )}
+      >
+        <Icon className={cn('h-4 w-4 shrink-0 transition-transform duration-200', active && 'scale-110')} />
+        <span className="flex-1 truncate">{label}</span>
+        {badge && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+            {badge}
+          </span>
+        )}
+      </Link>
+    );
   };
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
@@ -277,50 +285,37 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r bg-white transition-transform duration-200 ease-in-out dark:border-slate-800 dark:bg-slate-900',
+          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r bg-white transition-all duration-300 ease-in-out dark:border-slate-800 dark:bg-slate-900',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         )}
-        aria-label="School Admin navigation"
+        aria-label="School Admin Navigation"
       >
-        <div className="flex h-16 shrink-0 items-center justify-between border-b px-4 dark:border-slate-800">
-          <Link href="/school-admin/dashboard" className="flex items-center gap-2 font-bold text-lg min-w-0">
-            <School className="h-6 w-6 text-primary shrink-0" />
-            <span className="truncate">{sessionInfo?.schoolName || 'SchoolOS'}</span>
-          </Link>
+        <div className="flex h-16 shrink-0 items-center gap-3 border-b px-4 dark:border-slate-800">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+            <School className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <Link href="/school-admin/dashboard" className="block truncate text-sm font-bold">
+              {sessionInfo?.schoolName || 'SchoolOS'}
+            </Link>
+            <p className="truncate text-[10px] text-muted-foreground">School Admin</p>
+          </div>
           <button
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden text-muted-foreground hover:text-foreground"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5 scrollbar-thin">
           {navSections.map((section) => {
             const SectionIcon = section.icon;
             const isExpanded = expandedSections.has(section.title);
             const hasActiveChild = section.items.some((item) => isActive(item.href));
-            const sectionActive = hasActiveChild || isExpanded;
 
             if (section.items.length === 1) {
-              const item = section.items[0];
-              const ItemIcon = item.icon;
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                    active
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50',
-                  )}
-                >
-                  <ItemIcon className="h-4 w-4 shrink-0" />
-                  {item.label}
-                </Link>
-              );
+              return <SidebarLink key={section.items[0].href} item={section.items[0]} />;
             }
 
             return (
@@ -329,40 +324,23 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
                   onClick={() => toggleSection(section.title)}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                    sectionActive
+                    hasActiveChild
                       ? 'text-primary'
-                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-500',
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50',
                   )}
                 >
                   <SectionIcon className="h-4 w-4 shrink-0" />
                   <span className="flex-1 text-left">{section.title}</span>
-                  {isExpanded ? (
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  )}
+                  {isExpanded
+                    ? <ChevronDown className="h-3.5 w-3.5 transition-transform" />
+                    : <ChevronRight className="h-3.5 w-3.5 transition-transform" />
+                  }
                 </button>
                 {isExpanded && (
-                  <div className="ml-4 mt-1 space-y-1 border-l border-slate-200 pl-3 dark:border-slate-700">
-                    {section.items.map((item) => {
-                      const ItemIcon = item.icon;
-                      const active = isActive(item.href);
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={cn(
-                            'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                            active
-                              ? 'text-primary'
-                              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50',
-                          )}
-                        >
-                          <ItemIcon className="h-3.5 w-3.5 shrink-0" />
-                          {item.label}
-                        </Link>
-                      );
-                    })}
+                  <div className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-200 pl-3 dark:border-slate-700">
+                    {section.items.map((item) => (
+                      <SidebarLink key={item.href} item={item} />
+                    ))}
                   </div>
                 )}
               </div>
@@ -370,19 +348,7 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
           })}
         </nav>
 
-        <div className="border-t p-3 space-y-1 dark:border-slate-800">
-          <Link
-            href="/school-admin/settings"
-            className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              isActive('/school-admin/settings')
-                ? 'bg-primary/10 text-primary'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50',
-            )}
-          >
-            <Settings className="h-4 w-4 shrink-0" />
-            School Settings
-          </Link>
+        <div className="border-t p-3 space-y-0.5 dark:border-slate-800">
           <Link
             href="/school-admin/profile"
             className={cn(
@@ -406,10 +372,11 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
       </aside>
 
       <div className="flex flex-1 flex-col lg:pl-64">
-        <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 px-4 lg:px-6 dark:border-slate-800 dark:bg-slate-900/95">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 px-4 lg:px-6 dark:border-slate-800 dark:bg-slate-900/95">
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden text-muted-foreground hover:text-foreground"
+            aria-label="Open sidebar"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -418,22 +385,24 @@ export default function SchoolAdminLayout({ children }: { children: React.ReactN
 
           <button
             onClick={toggleTheme}
-            className="rounded-full p-2 text-muted-foreground hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800"
-            title={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
+            className="rounded-full p-2 text-muted-foreground hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 transition-colors"
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
           >
-            {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
 
           <div className="flex items-center gap-3 border-l pl-4 dark:border-slate-800">
-            <Avatar size="sm" fallback={sessionInfo?.name?.charAt(0) || 'A'} />
+            <Avatar size="sm" src={sessionInfo?.photo} fallback={sessionInfo?.name?.charAt(0) || 'A'} />
             <div className="hidden sm:block">
-              <p className="text-sm font-medium">{sessionInfo?.name || 'School Admin'}</p>
-              <p className="text-xs text-muted-foreground">{sessionInfo?.email || 'Loading...'}</p>
+              <p className="text-sm font-medium leading-tight">{sessionInfo?.name || 'School Admin'}</p>
+              <p className="text-xs text-muted-foreground">{sessionInfo?.email || ''}</p>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-6">{children}</main>
+        <main className="flex-1 p-4 lg:p-6 animate-in fade-in slide-in-from-top-1 duration-500">
+          {children}
+        </main>
       </div>
     </div>
   );

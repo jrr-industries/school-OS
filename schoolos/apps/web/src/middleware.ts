@@ -1,12 +1,11 @@
 // ============================================================
 // Middleware - Route Protection
-// Production: Supabase Auth
-// Development: Temporary Dev Auth for /admin/*
+// Production: Firebase Auth / BetterAuth with Session Verification
+// Development: Dev Auth for /admin/* and /school-admin/*
 // ============================================================
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
 import { getDevSessionFromCookies } from '@/lib/dev-session';
 
 const publicPaths = [
@@ -15,8 +14,11 @@ const publicPaths = [
   '/forgot-password',
   '/reset-password',
   '/api/auth/callback',
+  '/api/auth/login',
+  '/api/auth/logout',
   '/api/auth/dev-login',
   '/api/auth/dev-quick-login',
+  '/api/auth/session',
   '/api/health',
   '/_next/static',
   '/_next/image',
@@ -38,8 +40,13 @@ function isAdminPath(pathname: string): boolean {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Allow public paths through
+  if (isPublicPath(pathname)) {
+    return NextResponse.next();
+  }
+
   // ============================================================
-  // Temporary Development Authentication
+  // Development Authentication
   // Protects /admin/* and /school-admin/* routes using dev session cookie
   // ============================================================
   if (process.env.NODE_ENV === 'development' && isAdminPath(pathname)) {
@@ -68,60 +75,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Allow public paths through
-  if (isPublicPath(pathname)) {
-    return NextResponse.next();
-  }
-
   // ============================================================
-  // Production Authentication - Supabase
+  // Production - Firebase / BetterAuth Session Verification
+  // Session is verified by API endpoints; middleware does initial check
   // ============================================================
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  if (isAdminPath(pathname)) {
+    const sessionCookie = request.cookies.get('session')?.value;
+    const devSessionCookie = request.cookies.get('dev_session')?.value;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error(
-      `[Middleware] Missing Supabase environment variables. ` +
-      `Create apps/web/.env with SUPABASE_URL and SUPABASE_ANON_KEY ` +
-      `from https://supabase.com/dashboard/project/_/settings/api`,
-    );
-
-    if (process.env.NODE_ENV === 'development') {
-      // In development, allow access without Supabase
-      // so developers can work on UI without configuring Supabase
-      return NextResponse.next();
+    if (!sessionCookie && !devSessionCookie) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
     }
-
-    return new NextResponse('Configuration Error: Supabase credentials not configured.', { status: 500 });
   }
 
   const response = NextResponse.next();
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
-        cookiesToSet.forEach(({ name, value }) => {
-          request.cookies.set(name, value);
-        });
-        cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
-        });
-      },
-    },
-  });
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
 
   const tenantHeader = request.headers.get('x-school-id');
   if (!tenantHeader && !pathname.startsWith('/api/auth')) {
