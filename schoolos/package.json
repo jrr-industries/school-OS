@@ -7,11 +7,7 @@
     "dev": "pnpm --parallel -r dev",
     "dev:web": "pnpm --filter @schoolos/web dev",
     "dev:admin": "pnpm --filter @schoolos/admin dev",
-    "dev:dashboards": "pnpm --parallel --filter @schoolos/dashboard-* dev",
-    "dev:teacher": "pnpm --filter @schoolos/dashboard-teacher dev",
-    "dev:bus-tracker": "pnpm --filter @schoolos/dashboard-bus-tracker dev",
-    "dev:principal": "pnpm --filter @schoolos/dashboard-principal dev",
-    "dev:vice-principal": "pnpm --filter @schoolos/dashboard-vice-principal dev",
+
     "dev:all": "pnpm --parallel -r dev",
     "build": "pnpm -r build",
     "build:web": "pnpm --filter @schoolos/web build",

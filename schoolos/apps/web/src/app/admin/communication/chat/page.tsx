@@ -51,6 +51,7 @@ export default function ChatPage() {
   const [users, setUsers] = useState<ChatUser[]>([]);
   const [connected, setConnected] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Record<string, { userName: string }>>({});
+  const [apiError, setApiError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<any>(null);
   const typingTimeoutRef = useRef<any>(null);
@@ -102,6 +103,7 @@ export default function ChatPage() {
         const res = await fetch('/api/admin/chat/conversations');
         const json = await res.json();
         if (json.success) setConversations(json.data);
+        else if (json.error) setApiError(json.error);
       } catch {}
     };
     const init = async () => {
@@ -179,6 +181,7 @@ export default function ChatPage() {
       const res = await fetch('/api/admin/chat/users');
       const json = await res.json();
       if (json.success) setUsers(json.data);
+      else if (json.error) setApiError(json.error);
     } catch {}
   };
 
@@ -223,6 +226,12 @@ export default function ChatPage() {
             <Plus className="h-4 w-4" />
           </button>
         </div>
+
+        {apiError && (
+          <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-400">
+            {apiError}
+          </div>
+        )}
 
         {showNewChat && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowNewChat(false)}>

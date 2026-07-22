@@ -4,12 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
-  LayoutDashboard, School, UserCog, Users, Settings, Building2,
+  LayoutDashboard, School, Users, Settings, Building2,
   CalendarDays, BookOpen, ClipboardCheck, IndianRupee, Bus,
   MessageSquare, Bell, ScrollText, BarChart3, CreditCard,
   UserCircle, LogOut, Sun, Moon, Menu, X, ChevronDown, ChevronRight,
   BookMarked, FileSpreadsheet, Trophy, Wallet, PiggyBank,
-  Library, Monitor, Shield, Calendar, HeartPulse, Truck,
+  Library, Monitor, Shield, Calendar, HeartPulse,
   ChefHat
 } from 'lucide-react';
 import { Avatar, cn } from '@schoolos/ui';
@@ -38,11 +38,6 @@ const navSections: NavSection[] = [
     title: 'School Overview',
     icon: School,
     items: [{ label: 'School Info', href: '/school-admin/overview', icon: School }],
-  },
-  {
-    title: 'Principal',
-    icon: UserCog,
-    items: [{ label: 'Manage Principal', href: '/school-admin/principals', icon: UserCog }],
   },
   {
     title: 'Users',
@@ -125,11 +120,6 @@ const navSections: NavSection[] = [
     items: [{ label: 'Sports Dashboard', href: '/school-admin/sports', icon: HeartPulse }],
   },
   {
-    title: 'School Bus',
-    icon: Truck,
-    items: [{ label: 'Bus Management', href: '/school-admin/bus-management', icon: Truck }],
-  },
-  {
     title: 'Lunch Management',
     icon: ChefHat,
     items: [{ label: 'Lunch Dashboard', href: '/school-admin/lunch-management', icon: ChefHat }],
@@ -201,7 +191,7 @@ function SchoolAdminLayoutInner({ children }: { children: React.ReactNode }) {
   const { user, logout: authLogout } = useSchoolAdminAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set([
-    'Dashboard', 'School Overview', 'Principal', 'Users'
+    'Dashboard', 'School Overview', 'Users'
   ]));
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 

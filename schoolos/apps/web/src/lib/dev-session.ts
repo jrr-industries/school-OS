@@ -46,7 +46,7 @@ export async function createDevSession(session: DevSession): Promise<string> {
   const token = await signToken(JSON.stringify(session));
 
   cookieStore.set(COOKIE_NAME, token, {
-    httpOnly: true,
+    httpOnly: process.env.NODE_ENV === 'production',
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
@@ -60,7 +60,7 @@ export function setDevSessionCookie(
   token: string,
 ): void {
   response.cookies.set(COOKIE_NAME, token, {
-    httpOnly: true,
+    httpOnly: process.env.NODE_ENV === 'production',
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',

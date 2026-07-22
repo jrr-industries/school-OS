@@ -2,24 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   async rewrites() {
-    return [
-      {
-        source: '/dashboard/bus-tracker/:path*',
-        destination: 'http://localhost:3002/:path*',
-      },
-      {
-        source: '/dashboard/teacher/:path*',
-        destination: 'http://localhost:3003/:path*',
-      },
-      {
-        source: '/dashboard/principal/:path*',
-        destination: 'http://localhost:3004/:path*',
-      },
-      {
-        source: '/dashboard/vice-principal/:path*',
-        destination: 'http://localhost:3005/:path*',
-      },
-    ];
+    return [];
   },
   transpilePackages: [
     '@schoolos/ui',

@@ -1,7 +1,3 @@
 packages:
   - "apps/*"
   - "packages/*"
-  - "schoolos-teacher-dashboard"
-  - "schoolos-live-bus-tracker"
-  - "schoolos---principal-management-dashboard"
-  - "schoolos---vice-principal-dashboard"

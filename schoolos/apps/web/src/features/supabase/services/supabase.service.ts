@@ -88,11 +88,11 @@ export class SupabaseService {
     const channel = c.channel(`${table}-${schoolId}-list`);
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table, filter: `school_id=eq.${schoolId}` }, () => {
-        this.list<T>(table, schoolId).then(callback);
+        this.list<T>(table, schoolId).then(callback, () => callback([] as T[]));
       })
       .subscribe();
 
-    this.list<T>(table, schoolId).then(callback);
+    this.list<T>(table, schoolId).then(callback, () => callback([] as T[]));
 
     return () => {
       channel.unsubscribe();
@@ -109,11 +109,11 @@ export class SupabaseService {
     const channel = c.channel(`${table}-${id}`);
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table, filter: `id=eq.${id}` }, () => {
-        c.from(table).select('*').eq('id', id).single().then(({ data }) => callback(data as T | null));
+        c.from(table).select('*').eq('id', id).single().then(({ data }) => callback(data as T | null), () => callback(null));
       })
       .subscribe();
 
-    c.from(table).select('*').eq('id', id).single().then(({ data }) => callback(data as T | null));
+    c.from(table).select('*').eq('id', id).single().then(({ data }) => callback(data as T | null), () => callback(null));
 
     return () => {
       channel.unsubscribe();
@@ -141,11 +141,11 @@ export class SupabaseService {
     const channel = c.channel(`${table}-${field}-${value}`);
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table, filter: `${field}=eq.${value}` }, () => {
-        c.from(table).select('*').eq(field, value).single().then(({ data }) => callback(data as T | null));
+        c.from(table).select('*').eq(field, value).single().then(({ data }) => callback(data as T | null), () => callback(null));
       })
       .subscribe();
 
-    c.from(table).select('*').eq(field, value).single().then(({ data }) => callback(data as T | null));
+    c.from(table).select('*').eq(field, value).single().then(({ data }) => callback(data as T | null), () => callback(null));
 
     return () => {
       channel.unsubscribe();
