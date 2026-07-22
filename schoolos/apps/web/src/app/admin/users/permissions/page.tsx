@@ -3,16 +3,57 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
 import { Shield, Check, X } from 'lucide-react';
 
-const roles = ['Super Admin', 'School Admin', 'Teacher', 'Parent', 'Support Agent'];
+const roles = [
+  { name: 'Super Admin', key: 'super_admin' },
+  { name: 'School Admin', key: 'school_admin' },
+  { name: 'Teacher', key: 'teacher' },
+  { name: 'Parent', key: 'parent' },
+  { name: 'Support Agent', key: 'support_agent' },
+];
 
-const permissionGroups = ['Schools', 'Users', 'Billing', 'Settings', 'Reports'];
+const permissionGroups = [
+  { name: 'Schools', key: 'schools' },
+  { name: 'Users', key: 'users' },
+  { name: 'Billing', key: 'billing' },
+  { name: 'Settings', key: 'settings' },
+  { name: 'Reports', key: 'reports' },
+  { name: 'Communication', key: 'communication' },
+  { name: 'Analytics', key: 'analytics' },
+  { name: 'Security', key: 'security' },
+];
 
 const matrix: Record<string, Record<string, boolean>> = {
-  'Super Admin': { Schools: true, Users: true, Billing: true, Settings: true, Reports: true },
-  'School Admin': { Schools: true, Users: true, Billing: false, Settings: true, Reports: true },
-  'Teacher': { Schools: false, Users: false, Billing: false, Settings: false, Reports: true },
-  'Parent': { Schools: false, Users: false, Billing: false, Settings: false, Reports: true },
-  'Support Agent': { Schools: false, Users: true, Billing: false, Settings: false, Reports: false },
+  super_admin: {
+    schools: true, users: true, billing: true, settings: true,
+    reports: true, communication: true, analytics: true, security: true,
+  },
+  school_admin: {
+    schools: true, users: true, billing: false, settings: true,
+    reports: true, communication: true, analytics: true, security: false,
+  },
+  teacher: {
+    schools: false, users: false, billing: false, settings: false,
+    reports: true, communication: true, analytics: false, security: false,
+  },
+  parent: {
+    schools: false, users: false, billing: false, settings: false,
+    reports: true, communication: true, analytics: false, security: false,
+  },
+  support_agent: {
+    schools: false, users: true, billing: false, settings: false,
+    reports: false, communication: true, analytics: false, security: false,
+  },
+};
+
+const groupIcons: Record<string, string> = {
+  schools: '🏫',
+  users: '👤',
+  billing: '💳',
+  settings: '⚙️',
+  reports: '📊',
+  communication: '📢',
+  analytics: '📈',
+  security: '🔒',
 };
 
 export default function PermissionsPage() {
@@ -37,18 +78,23 @@ export default function PermissionsPage() {
                 <tr className="border-b text-left">
                   <th className="pb-3 pr-6 font-medium text-muted-foreground">Role</th>
                   {permissionGroups.map((group) => (
-                    <th key={group} className="pb-3 px-4 font-medium text-muted-foreground text-center">{group}</th>
+                    <th key={group.key} className="pb-3 px-4 font-medium text-muted-foreground text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-base">{groupIcons[group.key]}</span>
+                        <span className="text-xs">{group.name}</span>
+                      </div>
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {roles.map((role) => (
-                  <tr key={role} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                    <td className="py-3 pr-6 font-medium">{role}</td>
+                  <tr key={role.key} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                    <td className="py-3 pr-6 font-medium">{role.name}</td>
                     {permissionGroups.map((group) => {
-                      const allowed = matrix[role][group];
+                      const allowed = matrix[role.key][group.key];
                       return (
-                        <td key={group} className="py-3 px-4 text-center">
+                        <td key={group.key} className="py-3 px-4 text-center">
                           <span
                             className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${
                               allowed

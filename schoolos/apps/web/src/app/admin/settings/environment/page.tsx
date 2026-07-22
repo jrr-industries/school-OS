@@ -1,19 +1,11 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { Wrench, Database, Layers, RotateCcw } from 'lucide-react';
+import { Wrench, Database, Layers, RotateCcw, Loader2, AlertCircle } from 'lucide-react';
 
-interface EnvVar {
-  key: string;
-  value: string;
-  sensitive?: boolean;
-}
-
-interface EnvSection {
-  title: string;
-  icon: typeof Wrench;
-  vars: EnvVar[];
-}
+interface EnvVar { key: string; value: string; sensitive?: boolean; }
+interface EnvSection { title: string; icon: typeof Wrench; vars: EnvVar[]; }
 
 const sections: EnvSection[] = [
   {
@@ -61,6 +53,39 @@ const sections: EnvSection[] = [
 ];
 
 export default function EnvironmentPage() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/settings?group=environment');
+      const json = await res.json();
+      if (!json.success) setError(json.error || 'Failed to load');
+      setLoading(false);
+    } catch {
+      setError('Failed to fetch');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <button onClick={fetchData} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Retry</button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -84,9 +109,7 @@ export default function EnvironmentPage() {
                   {section.vars.map((env) => (
                     <div key={env.key} className="flex items-center justify-between py-2.5 text-sm">
                       <span className="font-mono text-xs font-medium text-muted-foreground">{env.key}</span>
-                      <span className={`font-mono text-xs ${env.sensitive ? 'tracking-wider' : ''}`}>
-                        {env.value}
-                      </span>
+                      <span className={`font-mono text-xs ${env.sensitive ? 'tracking-wider' : ''}`}>{env.value}</span>
                     </div>
                   ))}
                 </div>

@@ -1,88 +1,199 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { Users, Search } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Search, AlertCircle } from 'lucide-react';
+import { PageHeader, DataTable } from '@/features/super-admin/components';
+import type { Column } from '@/features/super-admin/components/SearchFilter';
 
 interface PlatformUser {
   id: string;
-  name: string;
+  schoolId: string | null;
   email: string;
-  role: string;
-  status: 'active' | 'inactive' | 'suspended';
-  lastActive: string;
+  name: string | null;
+  phone: string | null;
+  status: string;
+  isSuperAdmin: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  schoolName: string | null;
+  roles: Array<{ id: string; name: string; slug: string }>;
 }
 
-const mockUsers: PlatformUser[] = [
-  { id: '1', name: 'John Smith', email: 'john@schools.edu', role: 'School Admin', status: 'active', lastActive: '2 min ago' },
-  { id: '2', name: 'Sarah Johnson', email: 'sarah@academy.edu', role: 'Teacher', status: 'active', lastActive: '15 min ago' },
-  { id: '3', name: 'Michael Brown', email: 'michael@district.edu', role: 'Super Admin', status: 'active', lastActive: '1 hour ago' },
-  { id: '4', name: 'Emily Davis', email: 'emily@prep.edu', role: 'Teacher', status: 'inactive', lastActive: '2 days ago' },
-  { id: '5', name: 'Robert Wilson', email: 'robert@hs.edu', role: 'Parent', status: 'active', lastActive: '30 min ago' },
-  { id: '6', name: 'Jessica Martinez', email: 'jessica@elementary.edu', role: 'School Admin', status: 'suspended', lastActive: '1 week ago' },
-  { id: '7', name: 'David Thompson', email: 'david@middle.edu', role: 'Teacher', status: 'active', lastActive: '5 min ago' },
-  { id: '8', name: 'Amanda Garcia', email: 'amanda@tech.edu', role: 'Support Agent', status: 'inactive', lastActive: '3 days ago' },
-];
+interface UsersResponse {
+  success: boolean;
+  data: PlatformUser[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
 
-const statusStyles: Record<string, string> = {
+const statusColors: Record<string, string> = {
   active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
   inactive: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400',
   suspended: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  invited: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  disabled: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
 };
 
 export default function UsersPage() {
+  const [users, setUsers] = useState<PlatformUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', '10');
+      if (search) params.set('search', search);
+
+      const res = await fetch(`/api/admin/users?${params}`);
+      const json: UsersResponse = await res.json();
+
+      if (!json.success) {
+        setError('Failed to load users');
+        setUsers([]);
+      } else {
+        setUsers(json.data ?? []);
+        setTotal(json.meta?.total ?? 0);
+      }
+    } catch {
+      setError('Network error. Please try again.');
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, search]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearch(value);
+      setPage(1);
+    }, 400);
+  };
+
+  const formatDate = (date: string | null) => {
+    if (!date) return 'Never';
+    const d = new Date(date);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins} min ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`;
+    return d.toLocaleDateString('en-CA');
+  };
+
+  const columns: Column<PlatformUser>[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      accessor: (row) => (
+        <div>
+          <div className="font-medium">{row.name || 'Unnamed'}</div>
+          <div className="text-xs text-muted-foreground">{row.email}</div>
+        </div>
+      ),
+      sortable: true,
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      accessor: (row) => row.email,
+      sortable: true,
+    },
+    {
+      key: 'schoolName',
+      header: 'School',
+      accessor: (row) => row.schoolName || '-',
+      sortable: true,
+    },
+    {
+      key: 'roles',
+      header: 'Roles',
+      accessor: (row) =>
+        row.roles.length > 0
+          ? row.roles.map((r) => r.name).join(', ')
+          : row.isSuperAdmin
+            ? 'Super Admin'
+            : '-',
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      accessor: (row) => (
+        <span
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            statusColors[row.status] || 'bg-slate-100 text-slate-800'
+          }`}
+        >
+          {row.status}
+        </span>
+      ),
+    },
+    {
+      key: 'lastLoginAt',
+      header: 'Last Active',
+      accessor: (row) => (
+        <span className="text-muted-foreground text-xs">{formatDate(row.lastLoginAt)}</span>
+      ),
+      sortable: true,
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Platform Users</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage all platform users</p>
+      <PageHeader
+        title="Platform Users"
+        description="Manage all platform users"
+      />
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder="Search by name or email..."
+          value={searchInput}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            Users
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search users..."
-              className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            />
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="pb-3 font-medium text-muted-foreground">Name</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Email</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Role</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Status</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Last Active</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockUsers.map((user) => (
-                  <tr key={user.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                    <td className="py-3 font-medium">{user.name}</td>
-                    <td className="py-3 text-muted-foreground">{user.email}</td>
-                    <td className="py-3">{user.role}</td>
-                    <td className="py-3">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyles[user.status]}`}>
-                        {user.status}
-                      </span>
-                    </td>
-                    <td className="py-3 text-muted-foreground">{user.lastActive}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={columns}
+        data={users}
+        keyExtractor={(row) => row.id}
+        loading={loading}
+        emptyMessage="No users found."
+        pagination={{
+          page,
+          pageSize: 10,
+          total,
+          onPageChange: setPage,
+          onPageSizeChange: () => {},
+        }}
+      />
     </div>
   );
 }

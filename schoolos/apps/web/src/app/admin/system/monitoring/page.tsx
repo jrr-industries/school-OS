@@ -1,58 +1,66 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { Activity, Cpu, HardDrive, MemoryStick, BarChart3, ArrowUp, Layers } from 'lucide-react';
+import { Activity, Cpu, HardDrive, MemoryStick, BarChart3, ArrowUp, Layers, Loader2, AlertCircle } from 'lucide-react';
 
-interface Timeframe {
-  label: string;
-  value: string;
-}
-
-const timeframes: Timeframe[] = [
+const timeframes = [
   { label: '1h', value: '1h' },
   { label: '6h', value: '6h' },
   { label: '24h', value: '24h' },
   { label: '7d', value: '7d' },
 ];
 
-interface TopConsumer {
-  rank: number;
-  name: string;
-  type: 'process' | 'user' | 'school';
-  cpu: number;
-  memory: number;
-}
-
-const topConsumers: TopConsumer[] = [
-  { rank: 1, name: 'Report Generation Worker', type: 'process', cpu: 45, memory: 512 },
-  { rank: 2, name: 'Data Sync Service', type: 'process', cpu: 32, memory: 384 },
-  { rank: 3, name: 'Lincoln High School', type: 'school', cpu: 18, memory: 256 },
-  { rank: 4, name: 'Email Campaign Engine', type: 'process', cpu: 15, memory: 192 },
-  { rank: 5, name: 'Springfield Elementary', type: 'school', cpu: 8, memory: 128 },
-  { rank: 6, name: 'Bulk Import - Admin', type: 'user', cpu: 6, memory: 96 },
+const topConsumers = [
+  { rank: 1, name: 'Report Generation Worker', type: 'process' as const, cpu: 45, memory: 512 },
+  { rank: 2, name: 'Data Sync Service', type: 'process' as const, cpu: 32, memory: 384 },
+  { rank: 3, name: 'Lincoln High School', type: 'school' as const, cpu: 18, memory: 256 },
+  { rank: 4, name: 'Email Campaign Engine', type: 'process' as const, cpu: 15, memory: 192 },
+  { rank: 5, name: 'Springfield Elementary', type: 'school' as const, cpu: 8, memory: 128 },
+  { rank: 6, name: 'Bulk Import - Admin', type: 'user' as const, cpu: 6, memory: 96 },
 ];
 
-interface ActiveProcess {
-  pid: number;
-  name: string;
-  cpu: number;
-  memory: number;
-  status: 'running' | 'idle' | 'blocked';
-  started: string;
-}
-
-const activeProcesses: ActiveProcess[] = [
-  { pid: 2847, name: 'node server.js', cpu: 12.4, memory: 256, status: 'running', started: '2 days ago' },
-  { pid: 3102, name: 'bull:queue-processor', cpu: 8.7, memory: 192, status: 'running', started: '5 days ago' },
-  { pid: 1823, name: 'nginx: worker', cpu: 3.2, memory: 64, status: 'running', started: '14 days ago' },
-  { pid: 4491, name: 'redis-server', cpu: 1.8, memory: 128, status: 'running', started: '30 days ago' },
-  { pid: 5210, name: 'postgres: writer', cpu: 5.6, memory: 384, status: 'running', started: '30 days ago' },
-  { pid: 6732, name: 'cron: backup-job', cpu: 0.5, memory: 32, status: 'idle', started: '7 days ago' },
+const activeProcesses = [
+  { pid: 2847, name: 'node server.js', cpu: 12.4, memory: 256, status: 'running' as const, started: '2 days ago' },
+  { pid: 3102, name: 'bull:queue-processor', cpu: 8.7, memory: 192, status: 'running' as const, started: '5 days ago' },
+  { pid: 1823, name: 'nginx: worker', cpu: 3.2, memory: 64, status: 'running' as const, started: '14 days ago' },
+  { pid: 4491, name: 'redis-server', cpu: 1.8, memory: 128, status: 'running' as const, started: '30 days ago' },
+  { pid: 5210, name: 'postgres: writer', cpu: 5.6, memory: 384, status: 'running' as const, started: '30 days ago' },
+  { pid: 6732, name: 'cron: backup-job', cpu: 0.5, memory: 32, status: 'idle' as const, started: '7 days ago' },
 ];
 
 export default function MonitoringPage() {
   const [activeTimeframe, setActiveTimeframe] = useState('1h');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await new Promise(r => setTimeout(r, 500));
+      setLoading(false);
+    } catch {
+      setError('Failed to load');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <button onClick={fetchData} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Retry</button>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -63,15 +71,8 @@ export default function MonitoringPage() {
         </div>
         <div className="inline-flex items-center rounded-lg border border-input bg-background p-0.5">
           {timeframes.map((t) => (
-            <button
-              key={t.value}
-              onClick={() => setActiveTimeframe(t.value)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                activeTimeframe === t.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
+            <button key={t.value} onClick={() => setActiveTimeframe(t.value)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTimeframe === t.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
               {t.label}
             </button>
           ))}
@@ -143,31 +144,29 @@ export default function MonitoringPage() {
               Top Consumers
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {topConsumers.map((c) => (
-                <div key={c.rank} className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-muted-foreground w-4">{c.rank}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium truncate">{c.name}</span>
-                      <span className="text-xs text-muted-foreground">{c.cpu}% CPU</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${
-                        c.type === 'process' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                        c.type === 'school' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                      }`}>
-                        <Layers className="h-3 w-3 mr-0.5" />
-                        {c.type}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{c.memory} MB</span>
-                    </div>
+          <CardContent className="space-y-3">
+            {topConsumers.map((c) => (
+              <div key={c.rank} className="flex items-center gap-3">
+                <span className="text-xs font-medium text-muted-foreground w-4">{c.rank}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium truncate">{c.name}</span>
+                    <span className="text-xs text-muted-foreground">{c.cpu}% CPU</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${
+                      c.type === 'process' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                      c.type === 'school' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
+                      'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                    }`}>
+                      <Layers className="h-3 w-3 mr-0.5" />
+                      {c.type}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{c.memory} MB</span>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 
@@ -200,12 +199,10 @@ export default function MonitoringPage() {
                       <td className="py-2 pr-3 text-right text-xs">{p.memory} MB</td>
                       <td className="py-2 pr-3">
                         <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${
-                          p.status === 'running' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                          p.status === 'running' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' :
                           p.status === 'idle' ? 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200' :
                           'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        }`}>
-                          {p.status}
-                        </span>
+                        }`}>{p.status}</span>
                       </td>
                       <td className="py-2 text-xs text-muted-foreground">{p.started}</td>
                     </tr>

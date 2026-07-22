@@ -1,34 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { DatabaseBackup, Download, Clock, CheckCircle2, XCircle, RefreshCw, Calendar, HardDrive } from 'lucide-react';
+import { DatabaseBackup, Download, Clock, CheckCircle2, XCircle, RefreshCw, Calendar, HardDrive, Loader2, AlertCircle } from 'lucide-react';
 
-const lastBackup = {
-  date: '2024-12-15 03:00:17',
-  size: '2.4 GB',
-  type: 'Full',
-  status: 'completed',
-  duration: '14m 23s',
-};
-
-const scheduleConfig = {
-  frequency: 'Daily',
-  time: '03:00 AM UTC',
-  retention: '30 days',
-  includeFiles: true,
-  includeDatabase: true,
-  compression: 'gzip',
-};
+const lastBackup = { date: '2026-07-22 03:00:17', size: '2.4 GB', type: 'Full', status: 'completed', duration: '14m 23s' };
+const scheduleConfig = { frequency: 'Daily', time: '03:00 AM UTC', retention: '30 days', includeFiles: true, includeDatabase: true, compression: 'gzip' };
 
 const backups = [
-  { date: '2024-12-15 03:00', size: '2.4 GB', type: 'Full', status: 'completed' },
-  { date: '2024-12-14 03:00', size: '2.3 GB', type: 'Full', status: 'completed' },
-  { date: '2024-12-13 03:00', size: '2.4 GB', type: 'Full', status: 'completed' },
-  { date: '2024-12-12 03:00', size: '2.3 GB', type: 'Full', status: 'completed' },
-  { date: '2024-12-11 03:00', size: '856 MB', type: 'Incremental', status: 'completed' },
-  { date: '2024-12-10 03:00', size: '2.2 GB', type: 'Full', status: 'failed' },
-  { date: '2024-12-09 03:00', size: '2.2 GB', type: 'Full', status: 'completed' },
+  { date: '2026-07-22 03:00', size: '2.4 GB', type: 'Full', status: 'completed' },
+  { date: '2026-07-21 03:00', size: '2.3 GB', type: 'Full', status: 'completed' },
+  { date: '2026-07-20 03:00', size: '2.4 GB', type: 'Full', status: 'completed' },
+  { date: '2026-07-19 03:00', size: '2.3 GB', type: 'Full', status: 'completed' },
+  { date: '2026-07-18 03:00', size: '856 MB', type: 'Incremental', status: 'completed' },
+  { date: '2026-07-17 03:00', size: '2.2 GB', type: 'Full', status: 'failed' },
+  { date: '2026-07-16 03:00', size: '2.2 GB', type: 'Full', status: 'completed' },
 ];
 
 const retentionOptions = [
@@ -39,17 +25,47 @@ const retentionOptions = [
 ];
 
 const statusStyles: Record<string, string> = {
-  completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  completed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
   failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
 };
 
 export default function BackupPage() {
   const [running, setRunning] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await new Promise(r => setTimeout(r, 500));
+      setLoading(false);
+    } catch {
+      setError('Failed to load');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleManualBackup = () => {
     setRunning(true);
     setTimeout(() => setRunning(false), 3000);
   };
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <button onClick={fetchData} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Retry</button>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -90,11 +106,8 @@ export default function BackupPage() {
               <span className="text-sm text-muted-foreground">Duration</span>
               <span className="text-sm font-medium">{lastBackup.duration}</span>
             </div>
-            <button
-              onClick={handleManualBackup}
-              disabled={running}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
+            <button onClick={handleManualBackup} disabled={running}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
               {running ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               {running ? 'Running Backup...' : 'Run Manual Backup'}
             </button>
@@ -182,15 +195,13 @@ export default function BackupPage() {
             Retention Policy
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {retentionOptions.map((option) => (
-              <div key={option.label} className="flex items-center justify-between rounded-lg border p-3">
-                <span className="text-sm font-medium">{option.label}</span>
-                <span className="text-sm text-muted-foreground">{option.value}</span>
-              </div>
-            ))}
-          </div>
+        <CardContent className="space-y-3">
+          {retentionOptions.map((option) => (
+            <div key={option.label} className="flex items-center justify-between rounded-lg border p-3">
+              <span className="text-sm font-medium">{option.label}</span>
+              <span className="text-sm text-muted-foreground">{option.value}</span>
+            </div>
+          ))}
         </CardContent>
       </Card>
     </div>

@@ -1,64 +1,154 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { UserCog } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { AlertCircle } from 'lucide-react';
+import { PageHeader, DataTable } from '@/features/super-admin/components';
+import type { Column } from '@/features/super-admin/components/SearchFilter';
 
-interface Role {
+interface PlatformUser {
   id: string;
-  name: string;
-  users: number;
-  permissions: number;
-  lastModified: string;
+  status: string;
+  roles: Array<{ id: string; name: string; slug: string }>;
+  isSuperAdmin: boolean;
 }
 
-const mockRoles: Role[] = [
-  { id: '1', name: 'Super Admin', users: 3, permissions: 48, lastModified: '2024-03-15' },
-  { id: '2', name: 'School Admin', users: 24, permissions: 36, lastModified: '2024-03-12' },
-  { id: '3', name: 'Teacher', users: 184, permissions: 22, lastModified: '2024-03-10' },
-  { id: '4', name: 'Parent', users: 1205, permissions: 12, lastModified: '2024-02-28' },
-  { id: '5', name: 'Support Agent', users: 8, permissions: 18, lastModified: '2024-03-08' },
-];
+interface UsersResponse {
+  success: boolean;
+  data: PlatformUser[];
+  meta: { total: number };
+}
+
+interface RoleGroup {
+  name: string;
+  slug: string;
+  usersCount: number;
+  description: string;
+  isSystem: boolean;
+}
+
+const roleDefinitions: Record<string, { description: string; isSystem: boolean }> = {
+  super_admin: { description: 'Unrestricted access to all platform features and settings', isSystem: true },
+  school_admin: { description: 'Manage school settings, users, and subscriptions', isSystem: true },
+  teacher: { description: 'Create and manage classes, assignments, and grades', isSystem: true },
+  parent: { description: 'View student progress, communicate with teachers', isSystem: true },
+  support_agent: { description: 'Handle support tickets and user inquiries', isSystem: false },
+  accountant: { description: 'Manage billing, invoices, and financial reports', isSystem: false },
+  analyst: { description: 'View analytics and generate reports', isSystem: false },
+};
 
 export default function RolesPage() {
+  const [roleGroups, setRoleGroups] = useState<RoleGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/users?limit=1000');
+      const json: UsersResponse = await res.json();
+
+      if (!json.success) {
+        setError('Failed to load roles');
+        setRoleGroups([]);
+        return;
+      }
+
+      const users = json.data ?? [];
+      const roleCounts: Record<string, number> = {};
+
+      for (const user of users) {
+        if (user.isSuperAdmin) {
+          roleCounts['super_admin'] = (roleCounts['super_admin'] || 0) + 1;
+        }
+        for (const role of user.roles) {
+          roleCounts[role.slug] = (roleCounts[role.slug] || 0) + 1;
+        }
+      }
+
+      const groups: RoleGroup[] = Object.entries(roleDefinitions).map(([slug, def]) => ({
+        name: slug.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        slug,
+        usersCount: roleCounts[slug] || 0,
+        description: def.description,
+        isSystem: def.isSystem,
+      }));
+
+      groups.sort((a, b) => b.usersCount - a.usersCount);
+      setRoleGroups(groups);
+    } catch {
+      setError('Network error. Please try again.');
+      setRoleGroups([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const columns: Column<RoleGroup>[] = [
+    {
+      key: 'name',
+      header: 'Role Name',
+      accessor: (row) => (
+        <div>
+          <div className="font-medium">{row.name}</div>
+          <div className="text-xs text-muted-foreground">{row.slug}</div>
+        </div>
+      ),
+      sortable: true,
+    },
+    {
+      key: 'usersCount',
+      header: 'Users',
+      accessor: (row) => row.usersCount.toLocaleString(),
+      sortable: true,
+      align: 'right',
+    },
+    {
+      key: 'description',
+      header: 'Description',
+      accessor: (row) => <span className="text-muted-foreground">{row.description}</span>,
+    },
+    {
+      key: 'isSystem',
+      header: 'Type',
+      accessor: (row) =>
+        row.isSystem ? (
+          <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+            System
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+            Custom
+          </span>
+        ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Roles & Permissions</h1>
-        <p className="text-sm text-muted-foreground mt-1">Define and manage user roles</p>
-      </div>
+      <PageHeader
+        title="Roles & Permissions"
+        description="Define and manage user roles"
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <UserCog className="h-5 w-5 text-primary" />
-            Roles
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="pb-3 font-medium text-muted-foreground">Role Name</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Users</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Permissions</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Last Modified</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockRoles.map((role) => (
-                  <tr key={role.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                    <td className="py-3 font-medium">{role.name}</td>
-                    <td className="py-3">{role.users.toLocaleString()}</td>
-                    <td className="py-3">{role.permissions}</td>
-                    <td className="py-3 text-muted-foreground">{role.lastModified}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {error && (
+        <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <DataTable
+        columns={columns}
+        data={roleGroups}
+        keyExtractor={(row) => row.slug}
+        loading={loading}
+        emptyMessage="No roles found."
+      />
     </div>
   );
 }

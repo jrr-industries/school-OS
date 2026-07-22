@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Save } from 'lucide-react';
+import { Save, Loader2, AlertCircle } from 'lucide-react';
 import { Button, Input, Card, CardContent, CardHeader, CardTitle, Select } from '@schoolos/ui';
 import { PageHeader } from '@/features/school-admin/components/page-header';
+import { StaffService } from '@/features/school-admin/services/staff.service';
+import type { EmploymentType, EmployeeStatus } from '@/features/school-admin/types';
 
 const DESIGNATIONS = [
   { value: 'principal', label: 'Principal' },
@@ -37,30 +39,91 @@ const DEPARTMENTS = [
 export default function EditStaffPage() {
   const router = useRouter();
   const params = useParams();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
-    firstName: 'Rajesh',
-    lastName: 'Kumar',
-    email: 'rajesh@school.edu',
-    phone: '9876543210',
-    gender: 'male',
-    dateOfBirth: '1985-03-15',
-    qualification: 'M.Ed, B.Sc',
-    department: 'administration',
-    designation: 'principal',
-    joiningDate: '2020-06-01',
-    employmentType: 'full_time',
-    status: 'active',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    gender: 'male' as string,
+    dateOfBirth: '',
+    qualification: '',
+    departmentId: '',
+    designationId: '',
+    joiningDate: '',
+    employmentType: 'full_time' as EmploymentType,
+    status: 'active' as EmployeeStatus,
   });
 
-  const updateField = (field: string, value: string) => {
+  useEffect(() => {
+    if (!params.id) return;
+    StaffService.getEmployee(params.id as string)
+      .then((emp) => {
+        setFormData({
+          firstName: emp.firstName,
+          lastName: emp.lastName,
+          email: emp.email,
+          phone: emp.phone,
+          gender: emp.gender,
+          dateOfBirth: emp.dateOfBirth,
+          qualification: emp.qualification,
+          departmentId: emp.departmentId || '',
+          designationId: emp.designationId || '',
+          joiningDate: emp.joiningDate,
+          employmentType: emp.employmentType,
+          status: emp.status,
+        });
+        setLoading(false);
+      })
+      .catch(() => {
+        setError('Failed to load staff data');
+        setLoading(false);
+      });
+  }, [params.id]);
+
+  const updateField = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push(`/school-admin/staff/${params.id}`);
+    setSaving(true);
+    try {
+      const { gender, dateOfBirth, qualification, ...payload } = formData;
+      await StaffService.updateEmployee(params.id as string, payload);
+      router.push(`/school-admin/staff/${params.id}`);
+    } catch {
+      setError('Failed to save changes');
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error && !formData.firstName) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Edit Staff" description="Update staff information" />
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive" />
+            <h3 className="mt-4 text-lg font-medium">Error</h3>
+            <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+            <Button variant="outline" className="mt-4" onClick={() => router.push('/school-admin/staff')}>Back to Staff</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -75,6 +138,7 @@ export default function EditStaffPage() {
         ]}
       />
 
+      {error && formData.firstName && <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"><AlertCircle className="h-4 w-4" />{error}</div>}
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader><CardTitle>Personal Information</CardTitle></CardHeader>
@@ -126,7 +190,7 @@ export default function EditStaffPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Designation</label>
-                <Select value={formData.designation} onValueChange={(v) => updateField('designation', v)}>
+                <Select value={formData.designationId} onValueChange={(v) => updateField('designationId', v)}>
                   {DESIGNATIONS.map((d) => (
                     <option key={d.value} value={d.value}>{d.label}</option>
                   ))}
@@ -134,7 +198,7 @@ export default function EditStaffPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Department</label>
-                <Select value={formData.department} onValueChange={(v) => updateField('department', v)}>
+                <Select value={formData.departmentId} onValueChange={(v) => updateField('departmentId', v)}>
                   {DEPARTMENTS.map((d) => (
                     <option key={d.value} value={d.value}>{d.label}</option>
                   ))}
@@ -148,7 +212,7 @@ export default function EditStaffPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Employment Type</label>
-                <Select value={formData.employmentType} onValueChange={(v) => updateField('employmentType', v)}>
+                <Select value={formData.employmentType} onValueChange={(v) => updateField('employmentType', v as EmploymentType)}>
                   <option value="full_time">Full Time</option>
                   <option value="part_time">Part Time</option>
                   <option value="contract">Contract</option>
@@ -158,7 +222,7 @@ export default function EditStaffPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Status</label>
-              <Select value={formData.status} onValueChange={(v) => updateField('status', v)}>
+              <Select value={formData.status} onValueChange={(v) => updateField('status', v as EmployeeStatus)}>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
                 <option value="suspended">Suspended</option>
@@ -169,7 +233,7 @@ export default function EditStaffPage() {
 
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="outline" type="button" onClick={() => router.back()}>Cancel</Button>
-          <Button type="submit"><Save className="mr-2 h-4 w-4" />Save Changes</Button>
+          <Button type="submit" disabled={saving}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}{saving ? 'Saving...' : 'Save Changes'}</Button>
         </div>
       </form>
     </div>

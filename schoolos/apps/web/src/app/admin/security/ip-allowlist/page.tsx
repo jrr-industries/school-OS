@@ -1,7 +1,8 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { Shield, Plus, Trash2 } from 'lucide-react';
+import { Shield, Plus, Trash2, Loader2, AlertCircle } from 'lucide-react';
 
 interface IpEntry {
   id: string;
@@ -11,7 +12,7 @@ interface IpEntry {
   addedDate: string;
 }
 
-const ipEntries: IpEntry[] = [
+const mockEntries: IpEntry[] = [
   { id: '1', ip: '192.168.1.0/24', description: 'Main Office Network', addedBy: 'Super Admin', addedDate: '2026-01-01' },
   { id: '2', ip: '10.0.0.0/8', description: 'Corporate VPN', addedBy: 'John Smith', addedDate: '2026-02-15' },
   { id: '3', ip: '203.0.113.45', description: 'Primary Admin Workstation', addedBy: 'Super Admin', addedDate: '2026-03-10' },
@@ -21,6 +22,40 @@ const ipEntries: IpEntry[] = [
 ];
 
 export default function IpAllowlistPage() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await new Promise(r => setTimeout(r, 500));
+      setLoading(false);
+    } catch {
+      setError('Failed to load');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <button onClick={fetchData} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Retry</button>
+    </div>
+  );
+
+  const activeRanges = mockEntries.filter(e => e.ip.includes('/')).length;
+  const singleAddresses = mockEntries.filter(e => !e.ip.includes('/')).length;
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -37,19 +72,19 @@ export default function IpAllowlistPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold">6</p>
+            <p className="text-2xl font-bold">{mockEntries.length}</p>
             <p className="text-sm text-muted-foreground">Allowed IPs / CIDRs</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold">4</p>
+            <p className="text-2xl font-bold">{activeRanges}</p>
             <p className="text-sm text-muted-foreground">Active Ranges</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold">3</p>
+            <p className="text-2xl font-bold">{singleAddresses}</p>
             <p className="text-sm text-muted-foreground">Single Addresses</p>
           </CardContent>
         </Card>
@@ -75,7 +110,7 @@ export default function IpAllowlistPage() {
                 </tr>
               </thead>
               <tbody>
-                {ipEntries.map((entry) => (
+                {mockEntries.map((entry) => (
                   <tr key={entry.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0">
                     <td className="py-3 pr-4">
                       <span className="font-mono text-xs font-medium">{entry.ip}</span>

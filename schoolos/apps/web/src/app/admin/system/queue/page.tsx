@@ -1,7 +1,8 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { Clock, Loader2, CheckCircle2, TrendingUp, Activity } from 'lucide-react';
+import { Clock, Loader2, CheckCircle2, TrendingUp, Activity, AlertCircle } from 'lucide-react';
 
 const queues = [
   { name: 'emails', pending: 47, processing: 3, failed: 2, throughput: '142/hr' },
@@ -11,13 +12,44 @@ const queues = [
   { name: 'backups', pending: 0, processing: 1, failed: 0, throughput: '2/hr' },
 ];
 
-const totalStats = {
-  pending: queues.reduce((s, q) => s + q.pending, 0),
-  processing: queues.reduce((s, q) => s + q.processing, 0),
-  failed: queues.reduce((s, q) => s + q.failed, 0),
-};
-
 export default function QueuePage() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await new Promise(r => setTimeout(r, 500));
+      setLoading(false);
+    } catch {
+      setError('Failed to load');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <button onClick={fetchData} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Retry</button>
+    </div>
+  );
+
+  const totalStats = {
+    pending: queues.reduce((s, q) => s + q.pending, 0),
+    processing: queues.reduce((s, q) => s + q.processing, 0),
+    failed: queues.reduce((s, q) => s + q.failed, 0),
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -30,7 +62,7 @@ export default function QueuePage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-amber-100/10 p-2">
-                <Clock className="h-4 w-4 text-amber-600" />
+                <Clock className="h-4 w-4 text-amber-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{totalStats.pending}</p>
@@ -43,7 +75,7 @@ export default function QueuePage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-blue-100/10 p-2">
-                <Loader2 className="h-4 w-4 text-blue-600" />
+                <Loader2 className="h-4 w-4 text-blue-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{totalStats.processing}</p>
@@ -56,7 +88,7 @@ export default function QueuePage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-red-100/10 p-2">
-                <CheckCircle2 className="h-4 w-4 text-red-600" />
+                <CheckCircle2 className="h-4 w-4 text-red-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{totalStats.failed}</p>
@@ -88,15 +120,15 @@ export default function QueuePage() {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-xs text-muted-foreground">Pending</p>
-                    <p className="text-lg font-bold text-amber-600">{queue.pending}</p>
+                    <p className="text-lg font-bold text-amber-500">{queue.pending}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Processing</p>
-                    <p className="text-lg font-bold text-blue-600">{queue.processing}</p>
+                    <p className="text-lg font-bold text-blue-500">{queue.processing}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Failed</p>
-                    <p className="text-lg font-bold text-red-600">{queue.failed}</p>
+                    <p className="text-lg font-bold text-red-500">{queue.failed}</p>
                   </div>
                 </div>
               </div>

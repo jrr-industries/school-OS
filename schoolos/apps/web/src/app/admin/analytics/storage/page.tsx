@@ -1,13 +1,14 @@
 'use client';
 
-import { HardDrive, TrendingUp, FileText, Image, Video, FileArchive, School } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { HardDrive, TrendingUp, FileText, Image, Video, FileArchive, School, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
 
-const stats = [
-  { label: 'Total Storage Used', value: '342 GB', change: '+18.2%', trend: 'up', icon: HardDrive, color: 'text-blue-600' },
-  { label: 'Total Storage Allocated', value: '1 TB', change: '34.2% used', trend: 'up', icon: TrendingUp, color: 'text-emerald-600' },
-  { label: 'Avg Per School', value: '281 MB', change: '+7.3%', trend: 'up', icon: School, color: 'text-violet-600' },
-  { label: 'Files Total', value: '2.1M', change: '+22.4%', trend: 'up', icon: FileText, color: 'text-amber-600' },
+const mockStats = [
+  { label: 'Total Storage Used', value: '342 GB', change: '+18.2%', trend: 'up', icon: HardDrive, color: 'text-blue-500' },
+  { label: 'Total Storage Allocated', value: '1 TB', change: '34.2% used', trend: 'up', icon: TrendingUp, color: 'text-emerald-500' },
+  { label: 'Avg Per School', value: '281 MB', change: '+7.3%', trend: 'up', icon: School, color: 'text-violet-500' },
+  { label: 'Files Total', value: '2.1M', change: '+22.4%', trend: 'up', icon: FileText, color: 'text-amber-500' },
 ];
 
 const fileTypeBreakdown = [
@@ -18,12 +19,8 @@ const fileTypeBreakdown = [
 ];
 
 const growthTrend = [
-  { month: 'Feb', size: 270 },
-  { month: 'Mar', size: 285 },
-  { month: 'Apr', size: 298 },
-  { month: 'May', size: 310 },
-  { month: 'Jun', size: 325 },
-  { month: 'Jul', size: 342 },
+  { month: 'Feb', size: 270 }, { month: 'Mar', size: 285 }, { month: 'Apr', size: 298 },
+  { month: 'May', size: 310 }, { month: 'Jun', size: 325 }, { month: 'Jul', size: 342 },
 ];
 
 const topConsumers = [
@@ -35,6 +32,37 @@ const topConsumers = [
 ];
 
 export default function StorageAnalyticsPage() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await new Promise(r => setTimeout(r, 600));
+      setLoading(false);
+    } catch {
+      setError('Failed to load');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <button onClick={fetchData} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Retry</button>
+    </div>
+  );
+
   const maxGrowth = Math.max(...growthTrend.map(m => m.size));
 
   return (
@@ -45,16 +73,13 @@ export default function StorageAnalyticsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
+        {mockStats.map((stat) => {
           const Icon = stat.icon;
           return (
             <Card key={stat.label}>
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className={`rounded-lg bg-opacity-10 p-2 ${stat.color.replace('text-', 'bg-')}/10`}>
-                    <Icon className={`h-4 w-4 ${stat.color}`} />
-                  </div>
-                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                <div className={`rounded-lg ${stat.color.replace('text-', 'bg-')}/10 p-2 w-fit`}>
+                  <Icon className={`h-4 w-4 ${stat.color}`} />
                 </div>
                 <p className="mt-3 text-2xl font-bold">{stat.value}</p>
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
@@ -97,16 +122,13 @@ export default function StorageAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-end gap-2 h-40">
-              {growthTrend.map((m) => {
-                const height = (m.size / maxGrowth) * 100;
-                return (
-                  <div key={m.month} className="flex-1 flex flex-col items-center gap-2">
-                    <span className="text-xs font-medium">{m.size} GB</span>
-                    <div className="w-full rounded-t bg-blue-500 transition-all" style={{ height: `${height}%` }} />
-                    <span className="text-xs text-muted-foreground">{m.month}</span>
-                  </div>
-                );
-              })}
+              {growthTrend.map((m) => (
+                <div key={m.month} className="flex-1 flex flex-col items-center gap-2">
+                  <span className="text-xs font-medium">{m.size} GB</span>
+                  <div className="w-full rounded-t bg-blue-500 transition-all" style={{ height: `${(m.size / maxGrowth) * 100}%` }} />
+                  <span className="text-xs text-muted-foreground">{m.month}</span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

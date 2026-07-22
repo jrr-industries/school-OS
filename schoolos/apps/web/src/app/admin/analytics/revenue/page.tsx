@@ -1,25 +1,70 @@
 'use client';
 
-import { DollarSign, TrendingUp, TrendingDown, School, Percent } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { DollarSign, TrendingUp, School, Percent, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
 
-const stats = [
-  { label: 'MRR', value: '$189,420', change: '+7.2%', trend: 'up', icon: DollarSign, color: 'text-emerald-600' },
-  { label: 'ARR', value: '$2,273,040', change: '+7.2%', trend: 'up', icon: TrendingUp, color: 'text-blue-600' },
-  { label: 'Avg Revenue Per School', value: '$152.40', change: '+4.1%', trend: 'up', icon: School, color: 'text-violet-600' },
-  { label: 'Churn Rate', value: '2.1%', change: '-0.3%', trend: 'down', icon: Percent, color: 'text-rose-600' },
-];
-
-const monthlyRevenue = [
-  { month: 'Feb', subscription: 125000, oneTime: 34200 },
-  { month: 'Mar', subscription: 131000, oneTime: 28900 },
-  { month: 'Apr', subscription: 138000, oneTime: 31200 },
-  { month: 'May', subscription: 144000, oneTime: 27800 },
-  { month: 'Jun', subscription: 152000, oneTime: 35400 },
-  { month: 'Jul', subscription: 158000, oneTime: 31420 },
-];
+interface Subscription {
+  id: string;
+  planName: string;
+  price: number;
+  status: string;
+  schoolName: string;
+  createdAt: string;
+}
 
 export default function RevenueAnalyticsPage() {
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/subscriptions?status=active&limit=1000');
+      const json = await res.json();
+      if (json.success) setSubscriptions(json.data || []);
+      else setError(json.error || 'Failed to load data');
+    } catch {
+      setError('Failed to fetch revenue data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <button onClick={fetchData} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Retry</button>
+    </div>
+  );
+
+  const totalRevenue = subscriptions.reduce((sum, s) => sum + s.price, 0);
+  const planBreakdown = subscriptions.reduce<Record<string, { count: number; revenue: number }>>((acc, s) => {
+    if (!acc[s.planName]) acc[s.planName] = { count: 0, revenue: 0 };
+    acc[s.planName].count += 1;
+    acc[s.planName].revenue += s.price;
+    return acc;
+  }, {});
+
+  const monthlyMap = subscriptions.reduce<Record<string, number>>((acc, s) => {
+    const month = s.createdAt ? s.createdAt.substring(0, 7) : 'Unknown';
+    acc[month] = (acc[month] || 0) + s.price;
+    return acc;
+  }, {});
+
+  const monthlyRevenue = Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
+
   return (
     <div className="space-y-6">
       <div>
@@ -28,28 +73,42 @@ export default function RevenueAnalyticsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.label}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className={`rounded-lg bg-opacity-10 p-2 ${stat.color.replace('text-', 'bg-')}/10`}>
-                    <Icon className={`h-4 w-4 ${stat.color}`} />
-                  </div>
-                  {stat.trend === 'up' ? (
-                    <TrendingUp className="h-4 w-4 text-emerald-500" />
-                  ) : (
-                    <TrendingDown className="h-4 w-4 text-red-500" />
-                  )}
-                </div>
-                <p className="mt-3 text-2xl font-bold">{stat.value}</p>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-                <p className={`text-xs mt-1 ${stat.trend === 'up' ? 'text-emerald-500' : 'text-red-500'}`}>{stat.change}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
+        <Card>
+          <CardContent className="p-4">
+            <div className="rounded-lg bg-emerald-500/10 p-2 w-fit">
+              <DollarSign className="h-4 w-4 text-emerald-500" />
+            </div>
+            <p className="mt-3 text-2xl font-bold">${totalRevenue.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">Total MRR</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="rounded-lg bg-blue-500/10 p-2 w-fit">
+              <TrendingUp className="h-4 w-4 text-blue-500" />
+            </div>
+            <p className="mt-3 text-2xl font-bold">${(totalRevenue * 12).toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">Projected ARR</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="rounded-lg bg-violet-500/10 p-2 w-fit">
+              <School className="h-4 w-4 text-violet-500" />
+            </div>
+            <p className="mt-3 text-2xl font-bold">{subscriptions.length.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">Active Subscriptions</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="rounded-lg bg-rose-500/10 p-2 w-fit">
+              <Percent className="h-4 w-4 text-rose-500" />
+            </div>
+            <p className="mt-3 text-2xl font-bold">${subscriptions.length > 0 ? Math.round(totalRevenue / subscriptions.length).toLocaleString() : '0'}</p>
+            <p className="text-sm text-muted-foreground">Avg Revenue Per School</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -59,68 +118,41 @@ export default function RevenueAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {monthlyRevenue.map((m) => {
-                const total = m.subscription + m.oneTime;
-                const subPercent = (m.subscription / total) * 100;
+              {monthlyRevenue.length > 0 ? monthlyRevenue.map(([month, amount]) => {
+                const maxAmount = Math.max(...monthlyRevenue.map(([, a]) => a));
                 return (
-                  <div key={m.month} className="flex items-center gap-4">
-                    <span className="text-sm font-medium w-10 shrink-0">{m.month}</span>
-                    <div className="flex-1 flex flex-col gap-1">
-                      <div className="flex h-6 w-full rounded overflow-hidden bg-slate-100 dark:bg-slate-800">
-                        <div className="bg-blue-500 transition-all" style={{ width: `${subPercent}%` }} />
-                        <div className="bg-amber-500 transition-all" style={{ width: `${100 - subPercent}%` }} />
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Subscription: ${m.subscription.toLocaleString()}</span>
-                        <span>One-time: ${m.oneTime.toLocaleString()}</span>
+                  <div key={month} className="flex items-center gap-4">
+                    <span className="text-sm font-medium w-16 shrink-0">{month}</span>
+                    <div className="flex-1">
+                      <div className="h-6 w-full rounded overflow-hidden bg-slate-100 dark:bg-slate-800">
+                        <div className="h-full bg-blue-500 transition-all" style={{ width: `${(amount / maxAmount) * 100}%` }} />
                       </div>
                     </div>
-                    <span className="text-sm font-bold w-24 text-right">${total.toLocaleString()}</span>
+                    <span className="text-sm font-bold w-28 text-right">${amount.toLocaleString()}</span>
                   </div>
                 );
-              })}
+              }) : <p className="text-sm text-muted-foreground text-center py-4">No revenue data available</p>}
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Revenue Breakdown</CardTitle>
+            <CardTitle className="text-lg">Plan Distribution</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Subscription Revenue</span>
-              <span className="text-sm font-medium">$158,000 (83.4%)</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">One-time Payments</span>
-              <span className="text-sm font-medium">$31,420 (16.6%)</span>
-            </div>
-            <div className="border-t pt-4 mt-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold">Total Monthly Revenue</span>
-                <span className="text-sm font-bold">$189,420</span>
+            {Object.entries(planBreakdown).map(([plan, info]) => (
+              <div key={plan}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium">{plan}</span>
+                  <span className="text-sm text-muted-foreground">{info.count} schools - ${info.revenue.toLocaleString()}</span>
+                </div>
+                <div className="h-3 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${(info.revenue / totalRevenue) * 100}%` }} />
+                </div>
               </div>
-            </div>
-            <div className="pt-4 space-y-3">
-              <h4 className="text-sm font-medium">Plan Distribution</h4>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Enterprise</span>
-                <span className="text-sm font-medium">87 schools - $87,000</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Pro</span>
-                <span className="text-sm font-medium">312 schools - $62,400</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Basic</span>
-                <span className="text-sm font-medium">198 schools - $19,800</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Trial</span>
-                <span className="text-sm font-medium">46 schools - $0</span>
-              </div>
-            </div>
+            ))}
+            {Object.keys(planBreakdown).length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No plans found</p>}
           </CardContent>
         </Card>
       </div>

@@ -1,15 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { Globe2, Save } from 'lucide-react';
+import { Globe2, Save, Loader2, AlertCircle } from 'lucide-react';
 
-interface Language {
-  code: string;
-  name: string;
-  native: string;
-  enabled: boolean;
-}
+interface Language { code: string; name: string; native: string; enabled: boolean; }
 
 const defaultLanguages: Language[] = [
   { code: 'en', name: 'English', native: 'English', enabled: true },
@@ -21,19 +16,9 @@ const defaultLanguages: Language[] = [
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      onClick={onChange}
-      className={`peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-        checked ? 'bg-primary' : 'bg-input'
-      }`}
-    >
-      <span
-        className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${
-          checked ? 'translate-x-5' : 'translate-x-0'
-        }`}
-      />
+    <button role="switch" aria-checked={checked} onClick={onChange}
+      className={`peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${checked ? 'bg-primary' : 'bg-input'}`}>
+      <span className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   );
 }
@@ -41,14 +26,61 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
 export default function LocalizationPage() {
   const [languages, setLanguages] = useState(defaultLanguages);
   const [defaultLang, setDefaultLang] = useState('en');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const fetchSettings = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/settings?group=localization');
+      const json = await res.json();
+      if (json.success) setLoading(false);
+      else setError(json.error || 'Failed to load');
+    } catch {
+      setError('Failed to fetch settings');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSuccess(false);
+    setError(null);
+    try {
+      const entries = [
+        { key: 'default_language', value: defaultLang },
+        ...languages.map(l => ({ key: `lang_${l.code}`, value: String(l.enabled) })),
+      ];
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ group: 'localization', settings: entries }),
+      });
+      const json = await res.json();
+      if (json.success) setSuccess(true);
+      else setError(json.error || 'Failed to save');
+    } catch {
+      setError('Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const toggleLanguage = (code: string) => {
-    setLanguages((prev) =>
-      prev.map((lang) =>
-        lang.code === code ? { ...lang, enabled: !lang.enabled } : lang
-      )
-    );
+    setLanguages(prev => prev.map(l => l.code === code ? { ...l, enabled: !l.enabled } : l));
   };
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -56,6 +88,18 @@ export default function LocalizationPage() {
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Localization</h1>
         <p className="text-sm text-muted-foreground mt-1">Manage languages and regional settings</p>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+          <button onClick={fetchSettings} className="ml-auto text-xs underline">Retry</button>
+        </div>
+      )}
+
+      {success && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-400">Settings saved successfully</div>
+      )}
 
       <Card>
         <CardHeader>
@@ -88,14 +132,8 @@ export default function LocalizationPage() {
                       </div>
                     </td>
                     <td className="py-3 px-2 text-center">
-                      <input
-                        type="radio"
-                        name="default-language"
-                        checked={defaultLang === lang.code}
-                        onChange={() => setDefaultLang(lang.code)}
-                        disabled={!lang.enabled}
-                        className="h-4 w-4 border-slate-300 text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                      />
+                      <input type="radio" name="default-language" checked={defaultLang === lang.code} onChange={() => setDefaultLang(lang.code)} disabled={!lang.enabled}
+                        className="h-4 w-4 border-slate-300 text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50" />
                     </td>
                   </tr>
                 ))}
@@ -105,71 +143,12 @@ export default function LocalizationPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Globe2 className="h-5 w-5 text-primary" />
-            Regional Settings
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Date Format</label>
-              <select
-                defaultValue="MM/DD/YYYY"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option>MM/DD/YYYY</option>
-                <option>DD/MM/YYYY</option>
-                <option>YYYY-MM-DD</option>
-                <option>DD.MM.YYYY</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Time Format</label>
-              <select
-                defaultValue="12h"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="12h">12-hour (AM/PM)</option>
-                <option value="24h">24-hour</option>
-              </select>
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Number Format</label>
-              <select
-                defaultValue="1,234.56"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option>1,234.56</option>
-                <option>1 234.56</option>
-                <option>1.234,56</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Currency</label>
-              <select
-                defaultValue="USD"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option>USD ($)</option>
-                <option>EUR (€)</option>
-                <option>GBP (£)</option>
-                <option>JPY (¥)</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-end pt-2">
-            <button className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors gap-2">
-              <Save className="h-4 w-4" />
-              Save Changes
-            </button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex justify-end">
+        <button onClick={handleSave} disabled={saving} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors gap-2 disabled:opacity-50">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {saving ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
     </div>
   );
 }

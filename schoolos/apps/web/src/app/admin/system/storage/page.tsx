@@ -1,7 +1,8 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { HardDrive, FileImage, FileText, FileVideo, FileArchive, FileCode, AlertTriangle, Cloud } from 'lucide-react';
+import { HardDrive, FileImage, FileText, FileVideo, FileArchive, AlertTriangle, Cloud, Loader2, AlertCircle } from 'lucide-react';
 
 const totalSpace = 1024;
 const usedSpace = 782;
@@ -24,6 +25,8 @@ const fileTypes = [
   { label: 'Code', value: 85, icon: FileCode, color: 'text-emerald-500', percent: 11 },
 ];
 
+import { FileCode } from 'lucide-react';
+
 const cleanupSuggestions = [
   { item: 'Old backups (>30 days)', size: '45 GB', impact: 'high' },
   { item: 'Temporary uploads', size: '28 GB', impact: 'medium' },
@@ -38,6 +41,37 @@ const providers = [
 ];
 
 export default function StoragePage() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await new Promise(r => setTimeout(r, 500));
+      setLoading(false);
+    } catch {
+      setError('Failed to load');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <button onClick={fetchData} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Retry</button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -57,12 +91,7 @@ export default function StoragePage() {
             <div className="relative h-32 w-32 shrink-0">
               <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
                 <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3" className="text-slate-200 dark:text-slate-700" />
-                <circle
-                  cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3"
-                  strokeDasharray={`${usagePercent} ${100 - usagePercent}`}
-                  className="text-primary"
-                  strokeLinecap="round"
-                />
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray={`${usagePercent} ${100 - usagePercent}`} className="text-primary" strokeLinecap="round" />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-2xl font-bold">{usagePercent}%</span>
@@ -90,10 +119,7 @@ export default function StoragePage() {
                   <span className="text-sm text-muted-foreground">{svc.usage} GB</span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-700">
-                  <div
-                    className={`h-full rounded-full ${svc.color} transition-all`}
-                    style={{ width: `${(svc.usage / usedSpace) * 100}%` }}
-                  />
+                  <div className={`h-full rounded-full ${svc.color}`} style={{ width: `${(svc.usage / usedSpace) * 100}%` }} />
                 </div>
               </div>
             ))}
@@ -109,7 +135,7 @@ export default function StoragePage() {
               const Icon = ft.icon;
               return (
                 <div key={ft.label} className="flex items-center gap-3">
-                  <div className="rounded-lg bg-opacity-10 p-2 bg-slate-100 dark:bg-slate-800">
+                  <div className="rounded-lg p-2 bg-slate-100 dark:bg-slate-800">
                     <Icon className={`h-4 w-4 ${ft.color}`} />
                   </div>
                   <div className="flex-1">
@@ -135,24 +161,20 @@ export default function StoragePage() {
             Cleanup Suggestions
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {cleanupSuggestions.map((suggestion) => (
-              <div key={suggestion.item} className="flex items-center justify-between rounded-lg border p-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium">{suggestion.item}</span>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    suggestion.impact === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                    suggestion.impact === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400'
-                  }`}>
-                    {suggestion.impact} impact
-                  </span>
-                </div>
-                <span className="text-sm font-medium text-muted-foreground">{suggestion.size}</span>
+        <CardContent className="space-y-3">
+          {cleanupSuggestions.map((suggestion) => (
+            <div key={suggestion.item} className="flex items-center justify-between rounded-lg border p-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium">{suggestion.item}</span>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                  suggestion.impact === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                  suggestion.impact === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                  'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400'
+                }`}>{suggestion.impact} impact</span>
               </div>
-            ))}
-          </div>
+              <span className="text-sm font-medium text-muted-foreground">{suggestion.size}</span>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
@@ -163,24 +185,18 @@ export default function StoragePage() {
             Storage Providers
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {providers.map((provider) => (
-              <div key={provider.name} className="flex items-center justify-between rounded-lg border p-3">
-                <div>
-                  <p className="text-sm font-medium">{provider.name}</p>
-                  <p className="text-xs text-muted-foreground">{provider.type}</p>
-                </div>
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  provider.status === 'active'
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400'
-                }`}>
-                  {provider.status}
-                </span>
+        <CardContent className="space-y-3">
+          {providers.map((provider) => (
+            <div key={provider.name} className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium">{provider.name}</p>
+                <p className="text-xs text-muted-foreground">{provider.type}</p>
               </div>
-            ))}
-          </div>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                provider.status === 'active' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400'
+              }`}>{provider.status}</span>
+            </div>
+          ))}
         </CardContent>
       </Card>
     </div>

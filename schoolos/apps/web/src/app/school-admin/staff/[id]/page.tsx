@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
-  Edit, Trash2, Mail, Phone, Clock,
-  Download, XCircle, FileText
+  Edit, Trash2, Mail, Phone, Clock, Loader2,
+  Download, XCircle, FileText, AlertCircle, ArrowLeft
 } from 'lucide-react';
 import { Button, Badge, Card, CardContent, CardHeader, CardTitle, Tabs, TabsList, TabsTrigger, TabsContent } from '@schoolos/ui';
 import { PageHeader } from '@/features/school-admin/components/page-header';
+import { StaffService } from '@/features/school-admin/services/staff.service';
 import type { Employee, EmployeeStatus } from '@/features/school-admin/types';
 
 const statusColors: Record<EmployeeStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -19,35 +20,52 @@ const statusColors: Record<EmployeeStatus, 'default' | 'secondary' | 'destructiv
   terminated: 'destructive',
 };
 
-const mockStaff: Employee = {
-  id: '1',
-  schoolId: 's1',
-  employeeId: 'EMP001',
-  firstName: 'Rajesh',
-  lastName: 'Kumar',
-  email: 'rajesh@school.edu',
-  phone: '9876543210',
-  alternatePhone: '9876543000',
-  gender: 'male',
-  dateOfBirth: '1985-03-15',
-  bloodGroup: 'b_positive',
-  qualification: 'M.Ed, B.Sc',
-  experience: 15,
-  designationId: 'd1',
-  designation: { id: 'd1', title: 'Principal', slug: 'principal', hierarchyLevel: 80, isTeaching: false },
-  departmentId: 'dep1',
-  department: { id: 'dep1', name: 'Administration' },
-  employmentType: 'full_time',
-  status: 'active',
-  isClassTeacher: false,
-  joiningDate: '2020-06-01',
-  createdAt: '2024-01-01',
-  updatedAt: '2024-06-15',
-};
-
 export default function StaffDetailPage() {
   const params = useParams();
-  const [staff] = useState<Employee>(mockStaff);
+  const router = useRouter();
+  const [staff, setStaff] = useState<Employee | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!params.id) return;
+    setLoading(true);
+    StaffService.getEmployee(params.id as string)
+      .then((data) => {
+        setStaff(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError('Failed to load staff details');
+        setLoading(false);
+      });
+  }, [params.id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !staff) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Staff Profile" description="View and manage staff details" />
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive" />
+            <h3 className="mt-4 text-lg font-medium">Error Loading Staff</h3>
+            <p className="mt-2 text-sm text-muted-foreground">{error || 'Staff member not found'}</p>
+            <Button variant="outline" className="mt-4" onClick={() => router.push('/school-admin/staff')}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Staff
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -64,7 +82,7 @@ export default function StaffDetailPage() {
             <Link href={`/school-admin/staff/${params.id}/edit`}>
               <Button variant="outline"><Edit className="mr-2 h-4 w-4" />Edit</Button>
             </Link>
-            <Button variant="destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</Button>
+            <Button variant="destructive" onClick={async () => { await StaffService.deleteEmployee(params.id as string); router.push('/school-admin/staff'); }}><Trash2 className="mr-2 h-4 w-4" />Delete</Button>
           </div>
         }
       />

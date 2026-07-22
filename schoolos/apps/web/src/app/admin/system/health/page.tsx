@@ -1,7 +1,8 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@schoolos/ui';
-import { CheckCircle2, AlertTriangle, XCircle, Server, Database, HardDrive, Activity, Mail } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, Server, Database, HardDrive, Activity, Mail, Loader2, AlertCircle } from 'lucide-react';
 
 interface ServiceStatus {
   name: string;
@@ -11,7 +12,7 @@ interface ServiceStatus {
   icon: typeof Server;
 }
 
-const services: ServiceStatus[] = [
+const mockServices: ServiceStatus[] = [
   { name: 'API', status: 'operational', responseTime: '45ms', uptime: '99.97%', icon: Server },
   { name: 'Database', status: 'operational', responseTime: '12ms', uptime: '99.99%', icon: Database },
   { name: 'Cache (Redis)', status: 'operational', responseTime: '2ms', uptime: '100%', icon: HardDrive },
@@ -37,7 +38,38 @@ const statusText = (status: ServiceStatus['status']) => {
 };
 
 export default function SystemHealthPage() {
-  const operationalCount = services.filter((s) => s.status === 'operational').length;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await new Promise(r => setTimeout(r, 500));
+      setLoading(false);
+    } catch {
+      setError('Failed to load');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <button onClick={fetchData} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">Retry</button>
+    </div>
+  );
+
+  const operationalCount = mockServices.filter(s => s.status === 'operational').length;
 
   return (
     <div className="space-y-6">
@@ -49,7 +81,7 @@ export default function SystemHealthPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold">{operationalCount}/{services.length}</p>
+            <p className="text-2xl font-bold">{operationalCount}/{mockServices.length}</p>
             <p className="text-sm text-muted-foreground">Services Operational</p>
             <p className="text-xs text-emerald-600 mt-1">All systems normal</p>
           </CardContent>
@@ -69,7 +101,7 @@ export default function SystemHealthPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {services.map((service) => {
+        {mockServices.map((service) => {
           const Icon = service.icon;
           return (
             <Card key={service.name}>
