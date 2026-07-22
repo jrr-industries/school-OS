@@ -8,86 +8,12 @@ import {
   PieChart as PieChartIcon, Wallet,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn } from '@schoolos/ui';
-import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-
-interface MonthlyPnL {
-  month: string;
-  income: number;
-  expenses: number;
-  profit: number;
-}
-
-interface FinanceAnalytics {
-  totalIncome: number;
-  totalExpenses: number;
-  netProfit: number;
-  feeIncome: number;
-  transportIncome: number;
-  lunchIncome: number;
-  bookSales: number;
-  salaryExpenses: number;
-  maintenanceExpenses: number;
-  utilitiesExpenses: number;
-  otherExpenses: number;
-  incomeVsExpenses: { month: string; income: number; expenses: number }[];
-  expenseBreakdown: { category: string; amount: number; color: string }[];
-  monthlyPnL: MonthlyPnL[];
-}
-
-const sampleFinance: FinanceAnalytics = {
-  totalIncome: 42500000,
-  totalExpenses: 31800000,
-  netProfit: 10700000,
-  feeIncome: 28500000,
-  transportIncome: 5200000,
-  lunchIncome: 3800000,
-  bookSales: 5000000,
-  salaryExpenses: 18500000,
-  maintenanceExpenses: 4200000,
-  utilitiesExpenses: 3800000,
-  otherExpenses: 5300000,
-  incomeVsExpenses: [
-    { month: 'Apr', income: 3200000, expenses: 2500000 },
-    { month: 'May', income: 3100000, expenses: 2600000 },
-    { month: 'Jun', income: 3800000, expenses: 2800000 },
-    { month: 'Jul', income: 3700000, expenses: 2700000 },
-    { month: 'Aug', income: 3600000, expenses: 2650000 },
-    { month: 'Sep', income: 3900000, expenses: 2750000 },
-    { month: 'Oct', income: 3400000, expenses: 2600000 },
-    { month: 'Nov', income: 3500000, expenses: 2550000 },
-    { month: 'Dec', income: 3300000, expenses: 2700000 },
-    { month: 'Jan', income: 3800000, expenses: 2800000 },
-    { month: 'Feb', income: 3700000, expenses: 2600000 },
-    { month: 'Mar', income: 3600000, expenses: 2700000 },
-  ],
-  expenseBreakdown: [
-    { category: 'Salaries', amount: 18500000, color: '#6366f1' },
-    { category: 'Maintenance', amount: 4200000, color: '#f59e0b' },
-    { category: 'Utilities', amount: 3800000, color: '#06b6d4' },
-    { category: 'Other', amount: 5300000, color: '#ef4444' },
-  ],
-  monthlyPnL: [
-    { month: 'Apr', income: 3200000, expenses: 2500000, profit: 700000 },
-    { month: 'May', income: 3100000, expenses: 2600000, profit: 500000 },
-    { month: 'Jun', income: 3800000, expenses: 2800000, profit: 1000000 },
-    { month: 'Jul', income: 3700000, expenses: 2700000, profit: 1000000 },
-    { month: 'Aug', income: 3600000, expenses: 2650000, profit: 950000 },
-    { month: 'Sep', income: 3900000, expenses: 2750000, profit: 1150000 },
-    { month: 'Oct', income: 3400000, expenses: 2600000, profit: 800000 },
-    { month: 'Nov', income: 3500000, expenses: 2550000, profit: 950000 },
-    { month: 'Dec', income: 3300000, expenses: 2700000, profit: 600000 },
-    { month: 'Jan', income: 3800000, expenses: 2800000, profit: 1000000 },
-    { month: 'Feb', income: 3700000, expenses: 2600000, profit: 1100000 },
-    { month: 'Mar', income: 3600000, expenses: 2700000, profit: 900000 },
-  ],
-};
 
 function formatINR(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -120,43 +46,17 @@ function StatCardSkeleton() {
 }
 
 export default function FinanceDashboardPage() {
-  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
-  const [data, setData] = useState<FinanceAnalytics | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!schoolId) {
-      if (!authLoading) {
-        setData(sampleFinance);
-        setLoading(false);
-      }
-      return;
-    }
-
-    const unsub = SupabaseService.subscribeByField<FinanceAnalytics>(
-      'finance_analytics', schoolId, 'school_id', schoolId,
-      (fetched) => {
-        if (fetched) {
-          setData(fetched);
-          setLoading(false);
-        }
-      },
-    );
-
-    const timeout = setTimeout(() => {
-      if (loading) {
-        setData(sampleFinance);
-        setLoading(false);
-        toast.info('Using sample data — realtime feed unavailable');
-      }
-    }, 5000);
-
-    return () => {
-      unsub();
-      clearTimeout(timeout);
-    };
-  }, [schoolId, authLoading]);
+    fetch('/api/school-admin/finance')
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setData(json.data); })
+      .catch(() => toast.error('Failed to load finance data'))
+      .finally(() => setLoading(false));
+  }, []);
 
   const profitMargin = useMemo(() => {
     if (!data) return 0;
@@ -179,7 +79,7 @@ export default function FinanceDashboardPage() {
     );
   }
 
-  const isLoading = authLoading || (loading && !data);
+  const isLoading = loading && !data;
 
   return (
     <motion.div
@@ -504,7 +404,7 @@ export default function FinanceDashboardPage() {
                         dataKey="amount"
                         paddingAngle={4}
                       >
-                        {data!.expenseBreakdown.map((entry) => (
+                        {data!.expenseBreakdown.map((entry: any) => (
                           <Cell key={entry.category} fill={entry.color} />
                         ))}
                       </Pie>
@@ -560,7 +460,7 @@ export default function FinanceDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data!.monthlyPnL.map((row, idx) => {
+                    {data!.monthlyPnL.map((row: any, idx: number) => {
                       const margin = row.income > 0 ? (row.profit / row.income) * 100 : 0;
                       return (
                         <motion.tr

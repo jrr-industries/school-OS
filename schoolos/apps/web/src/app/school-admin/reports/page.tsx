@@ -7,8 +7,8 @@ import {
   AlertCircle, Filter,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Button, cn } from '@schoolos/ui';
-import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
 import { PageHeader } from '@/features/school-admin/components/page-header';
+import { toast } from 'sonner';
 
 const dateRanges = [
   { label: 'Today', value: 'today' },
@@ -23,8 +23,6 @@ interface ReportType {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   color: string;
-  path: string;
-  sampleData: Record<string, string>[];
   columns: string[];
 }
 
@@ -35,13 +33,7 @@ const reportTypes: ReportType[] = [
     description: 'Complete user data including students, teachers, parents, and staff',
     icon: Users,
     color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400',
-    path: 'users',
     columns: ['Name', 'Role', 'Email', 'Phone', 'Status', 'Last Login'],
-    sampleData: [
-      { Name: 'John Doe', Role: 'Student', Email: 'john@school.com', Phone: '9876543210', Status: 'Active', 'Last Login': '2026-07-20' },
-      { Name: 'Jane Smith', Role: 'Teacher', Email: 'jane@school.com', Phone: '9876543211', Status: 'Active', 'Last Login': '2026-07-21' },
-      { Name: 'Bob Wilson', Role: 'Parent', Email: 'bob@school.com', Phone: '9876543212', Status: 'Active', 'Last Login': '2026-07-19' },
-    ],
   },
   {
     id: 'attendance',
@@ -49,13 +41,7 @@ const reportTypes: ReportType[] = [
     description: 'Daily and monthly attendance records with percentages',
     icon: ClipboardCheck,
     color: 'text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400',
-    path: 'attendance',
     columns: ['Date', 'Total', 'Present', 'Absent', 'Late', 'Percentage'],
-    sampleData: [
-      { Date: '2026-07-15', Total: '500', Present: '470', Absent: '20', Late: '10', Percentage: '94%' },
-      { Date: '2026-07-16', Total: '500', Present: '465', Absent: '25', Late: '10', Percentage: '93%' },
-      { Date: '2026-07-17', Total: '500', Present: '480', Absent: '12', Late: '8', Percentage: '96%' },
-    ],
   },
   {
     id: 'fee',
@@ -63,13 +49,7 @@ const reportTypes: ReportType[] = [
     description: 'Fee collection, pending fees, and payment history',
     icon: IndianRupee,
     color: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400',
-    path: 'fees',
     columns: ['Student', 'Class', 'Amount', 'Paid', 'Pending', 'Due Date'],
-    sampleData: [
-      { Student: 'Alice Brown', Class: '10A', Amount: '₹25,000', Paid: '₹25,000', Pending: '₹0', 'Due Date': '2026-06-30' },
-      { Student: 'Charlie Davis', Class: '9B', Amount: '₹22,000', Paid: '₹15,000', Pending: '₹7,000', 'Due Date': '2026-06-30' },
-      { Student: 'Diana Evans', Class: '11C', Amount: '₹28,000', Paid: '₹20,000', Pending: '₹8,000', 'Due Date': '2026-07-15' },
-    ],
   },
   {
     id: 'staff',
@@ -77,13 +57,7 @@ const reportTypes: ReportType[] = [
     description: 'Staff directory, roles, salaries, and performance',
     icon: Briefcase,
     color: 'text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400',
-    path: 'staff',
     columns: ['Name', 'Department', 'Role', 'Salary', 'Joined', 'Status'],
-    sampleData: [
-      { Name: 'Dr. Kumar', Department: 'Science', Role: 'HOD', Salary: '₹85,000', Joined: '2020-04-01', Status: 'Active' },
-      { Name: 'Ms. Patel', Department: 'Mathematics', Role: 'Teacher', Salary: '₹55,000', Joined: '2021-08-15', Status: 'Active' },
-      { Name: 'Mr. Singh', Department: 'Admin', Role: 'Accountant', Salary: '₹45,000', Joined: '2019-01-10', Status: 'Active' },
-    ],
   },
   {
     id: 'school',
@@ -91,13 +65,7 @@ const reportTypes: ReportType[] = [
     description: 'Overall school statistics and performance metrics',
     icon: School,
     color: 'text-rose-600 bg-rose-100 dark:bg-rose-900/30 dark:text-rose-400',
-    path: 'school',
     columns: ['Metric', 'Value', 'Previous', 'Change', 'Status'],
-    sampleData: [
-      { Metric: 'Total Students', Value: '1,850', Previous: '1,720', Change: '+7.6%', Status: 'Good' },
-      { Metric: 'Pass Rate', Value: '92%', Previous: '89%', Change: '+3.4%', Status: 'Excellent' },
-      { Metric: 'Fee Collection', Value: '₹8.5L', Previous: '₹7.2L', Change: '+18%', Status: 'Good' },
-    ],
   },
 ];
 
@@ -126,7 +94,6 @@ function generateCSV(data: Record<string, string>[], filename: string) {
 }
 
 export default function ReportsPage() {
-  useSchoolAdminAuth();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [dateRange, setDateRange] = useState('month');
@@ -139,13 +106,21 @@ export default function ReportsPage() {
     setSelectedReport(reportId);
     setGenerating(true);
     setLoading(true);
-    const found = reportTypes.find((r) => r.id === reportId);
-    if (found) {
-      await new Promise((r) => setTimeout(r, 800));
-      setPreviewData(found.sampleData);
+    try {
+      const res = await fetch('/api/school-admin/reports');
+      const json = await res.json();
+      if (json.success && json.data && json.data[reportId]) {
+        setPreviewData(json.data[reportId] as Record<string, string>[]);
+      } else {
+        setPreviewData([]);
+      }
+    } catch {
+      setPreviewData([]);
+      toast.error('Failed to load report data');
+    } finally {
+      setLoading(false);
+      setGenerating(false);
     }
-    setLoading(false);
-    setGenerating(false);
   }, []);
 
   const handleExportPDF = useCallback(() => {
@@ -201,33 +176,32 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {reportTypes.map((report) => {
-          const Icon = report.icon;
-          const isSelected = selectedReport === report.id;
+        {reportTypes.map((reportType) => {
+          const Icon = reportType.icon;
+          const isSelected = selectedReport === reportType.id;
           return (
             <Card
-              key={report.id}
+              key={reportType.id}
               className={cn(
                 'relative overflow-hidden transition-all duration-200 hover:shadow-md cursor-pointer',
                 isSelected && 'ring-2 ring-primary',
               )}
-              onClick={() => handleGenerate(report.id)}
+              onClick={() => handleGenerate(reportType.id)}
             >
               <CardContent className="p-5">
                 <div className="flex items-start gap-4">
-                  <div className={cn('rounded-lg p-3 shrink-0', report.color)}>
+                  <div className={cn('rounded-lg p-3 shrink-0', reportType.color)}>
                     <Icon className="h-6 w-6" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold">{report.title}</h3>
-                    <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{report.description}</p>
-
+                    <h3 className="font-semibold">{reportType.title}</h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{reportType.description}</p>
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                       <Button
                         variant={isSelected ? 'default' : 'outline'}
                         size="sm"
                         className="gap-1.5 text-xs h-8"
-                        onClick={(e) => { e.stopPropagation(); handleGenerate(report.id); }}
+                        onClick={(e) => { e.stopPropagation(); handleGenerate(reportType.id); }}
                         disabled={generating}
                       >
                         {generating && isSelected ? (
@@ -237,7 +211,7 @@ export default function ReportsPage() {
                         )}
                         {generating && isSelected ? 'Generating...' : 'Generate'}
                       </Button>
-                      {isSelected && previewData && (
+                      {isSelected && previewData && previewData.length > 0 && (
                         <>
                           <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-8" onClick={(e) => { e.stopPropagation(); handleExportPDF(); }}>
                             <Printer className="h-3.5 w-3.5" /> PDF
@@ -267,9 +241,9 @@ export default function ReportsPage() {
                 <Eye className="h-4 w-4 text-muted-foreground" />
                 Preview: {report?.title}
               </CardTitle>
-              <p className="text-xs text-muted-foreground">Sample data preview</p>
+              <p className="text-xs text-muted-foreground">Report data preview</p>
             </div>
-            {previewData && (
+            {previewData && previewData.length > 0 && (
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handleExportPDF}>
                   <Printer className="h-3.5 w-3.5" /> Print / PDF
@@ -317,7 +291,7 @@ export default function ReportsPage() {
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                 <AlertCircle className="h-8 w-8 mb-2" />
-                <p className="text-sm">No data available for this report</p>
+                <p className="text-sm">No report data generated yet. Generate a report to see preview.</p>
               </div>
             )}
           </CardContent>

@@ -7,8 +7,6 @@ import {
   ClipboardList, UserCheck, DoorOpen,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn, Skeleton, Button } from '@schoolos/ui';
-import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -131,47 +129,27 @@ const incidentStatusColors: Record<string, 'destructive' | 'warning' | 'success'
 };
 
 export default function SecurityDashboardPage() {
-  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
-  const [data, setData] = useState<SecurityData | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAcknowledged, setShowAcknowledged] = useState(false);
 
   useEffect(() => {
-    if (!schoolId) return;
-
-    const unsub = SupabaseService.subscribeByField<SecurityData>(
-      'security_analytics', schoolId, 'school_id', schoolId,
-      (result) => {
-        if (result) {
-          setData(result);
-          setLoading(false);
-        } else {
-          setData(defaultSecurityData);
-          setLoading(false);
-        }
-      },
-    );
-
-    const timeout = setTimeout(() => {
-      if (loading) {
-        setData(defaultSecurityData);
-        setLoading(false);
-        toast.info('Using sample security data');
-      }
-    }, 5000);
-
-    return () => {
-      unsub();
-      clearTimeout(timeout);
-    };
-  }, [schoolId]);
+    fetch('/api/school-admin/security-dashboard')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && Object.keys(json.data).length > 0) setData(json.data);
+        else setData(defaultSecurityData);
+      })
+      .catch(() => setError('Failed to load data'))
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     if (error) toast.error(error);
   }, [error]);
 
-  if (authLoading) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <Skeleton variant="text" className="w-56 h-8" />
@@ -272,7 +250,7 @@ export default function SecurityDashboardPage() {
                 <div>
                   <p className="text-3xl font-bold">{data!.gatePasses.length}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {data!.gatePasses.filter((g) => g.status === 'active').length} active
+                    {data!.gatePasses.filter((g: any) => g.status === 'active').length} active
                   </p>
                 </div>
               )}
@@ -295,7 +273,7 @@ export default function SecurityDashboardPage() {
                 <div>
                   <p className="text-3xl font-bold">{data!.pickupRecords.length}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {data!.pickupRecords.filter((p) => p.status === 'pending').length} pending completion
+                    {data!.pickupRecords.filter((p: any) => p.status === 'pending').length} pending completion
                   </p>
                 </div>
               )}
@@ -318,7 +296,7 @@ export default function SecurityDashboardPage() {
                 <div>
                   <p className="text-3xl font-bold">{data!.cctvAlerts.length}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {data!.cctvAlerts.filter((a) => !a.acknowledged).length} unacknowledged
+                    {data!.cctvAlerts.filter((a: any) => !a.acknowledged).length} unacknowledged
                   </p>
                 </div>
               )}
@@ -353,8 +331,8 @@ export default function SecurityDashboardPage() {
               ) : (
                 <div className="space-y-2">
                   {data!.cctvAlerts
-                    .filter((a) => showAcknowledged || !a.acknowledged)
-                    .map((alert) => (
+                    .filter((a: any) => showAcknowledged || !a.acknowledged)
+                    .map((alert: any) => (
                       <div key={alert.id} className="flex items-center justify-between rounded-lg border p-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
@@ -401,7 +379,7 @@ export default function SecurityDashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {data!.emergencyContacts.map((contact, i) => (
+                  {data!.emergencyContacts.map((contact: any, i: number) => (
                     <div key={i} className="flex items-center justify-between rounded-lg border p-2.5">
                       <div>
                         <p className="text-sm font-medium">{contact.name}</p>
@@ -488,7 +466,7 @@ export default function SecurityDashboardPage() {
               </div>
             ) : (
               <div className="divide-y">
-                {data!.incidentReports.map((incident) => (
+                {data!.incidentReports.map((incident: any) => (
                   <div key={incident.id} className="flex items-start justify-between py-3 first:pt-0 last:pb-0">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">

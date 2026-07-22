@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { toast } from 'sonner';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -14,57 +13,9 @@ import {
 import {
   Card, CardHeader, CardTitle, CardContent, Badge, Button, cn,
 } from '@schoolos/ui';
-import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 
-const SAMPLE_DATA = {
-  totalBuses: 8,
-  activeBuses: 6,
-  inactiveBuses: 2,
-  routes: 12,
-  drivers: 8,
-  conductors: 8,
-  studentsAssigned: 680,
-  totalStudents: 1240,
-  fuelCost: 42500,
-  maintenanceCost: 18300,
-  monthlyFuelCost: 42500,
-  monthlyMaintenanceCost: 18300,
-  buses: [
-    { id: 'BUS-001', number: 'KA-01-1234', route: 'Route A - North', driver: 'Suresh Kumar', conductor: 'Ramesh', status: 'active', capacity: 52, assigned: 48, gps: 'online', location: 'Sector 5, Main Road', lastUpdated: '2 min ago', late: false },
-    { id: 'BUS-002', number: 'KA-01-5678', route: 'Route B - South', driver: 'Mahesh Reddy', conductor: 'Venkat', status: 'active', capacity: 52, assigned: 50, gps: 'online', location: 'City Center Stop', lastUpdated: '1 min ago', late: false },
-    { id: 'BUS-003', number: 'KA-01-9012', route: 'Route C - East', driver: 'Prakash Rao', conductor: 'Anil', status: 'active', capacity: 40, assigned: 35, gps: 'online', location: 'East Gate', lastUpdated: '3 min ago', late: true },
-    { id: 'BUS-004', number: 'KA-01-3456', route: 'Route D - West', driver: 'Ganesh', conductor: 'Sunil', status: 'active', capacity: 52, assigned: 44, gps: 'offline', location: 'Depot', lastUpdated: '15 min ago', late: false },
-    { id: 'BUS-005', number: 'KA-01-7890', route: 'Route E - Central', driver: 'Dinesh', conductor: 'Mohan', status: 'inactive', capacity: 40, assigned: 0, gps: 'offline', location: 'Workshop', lastUpdated: '1 day ago', late: false },
-    { id: 'BUS-006', number: 'KA-01-2345', route: 'Route F - Ring Road', driver: 'Harish', conductor: 'Kiran', status: 'active', capacity: 52, assigned: 46, gps: 'online', location: 'Ring Road Junction', lastUpdated: '2 min ago', late: false },
-    { id: 'BUS-007', number: 'KA-01-6789', route: 'Route G - Industrial', driver: 'Jagdish', conductor: 'Ravi', status: 'active', capacity: 40, assigned: 38, gps: 'online', location: 'Industrial Area', lastUpdated: '4 min ago', late: true },
-    { id: 'BUS-008', number: 'KA-01-0123', route: 'Route H - Village Road', driver: 'Karthik', conductor: 'Sridhar', status: 'inactive', capacity: 32, assigned: 0, gps: 'offline', location: 'Garage', lastUpdated: '2 days ago', late: false },
-  ],
-  lateBuses: [
-    { id: 'BUS-003', number: 'KA-01-9012', route: 'Route C - East', delay: '12 min', reason: 'Traffic congestion' },
-    { id: 'BUS-007', number: 'KA-01-6789', route: 'Route G - Industrial', delay: '8 min', reason: 'Road construction' },
-  ],
-  capacityUtilization: [
-    { route: 'Route A', capacity: 52, assigned: 48 },
-    { route: 'Route B', capacity: 52, assigned: 50 },
-    { route: 'Route C', capacity: 40, assigned: 35 },
-    { route: 'Route D', capacity: 52, assigned: 44 },
-    { route: 'Route E', capacity: 40, assigned: 0 },
-    { route: 'Route F', capacity: 52, assigned: 46 },
-    { route: 'Route G', capacity: 40, assigned: 38 },
-    { route: 'Route H', capacity: 32, assigned: 0 },
-  ],
-  routeEfficiency: [
-    { route: 'Route A - North', efficiency: 92, onTime: 48, total: 52 },
-    { route: 'Route B - South', efficiency: 96, onTime: 50, total: 52 },
-    { route: 'Route C - East', efficiency: 78, onTime: 31, total: 40 },
-    { route: 'Route D - West', efficiency: 88, onTime: 46, total: 52 },
-    { route: 'Route F - Ring Road', efficiency: 90, onTime: 47, total: 52 },
-    { route: 'Route G - Industrial', efficiency: 82, onTime: 33, total: 40 },
-  ],
-  lastUpdated: new Date().toISOString(),
-};
+
 
 function StatCard({ title, value, icon: Icon, color, trend, loading }: {
   title: string; value: string; icon: React.ComponentType<{ className?: string }>; color: string; trend?: { value: number; positive: boolean }; loading?: boolean;
@@ -133,38 +84,19 @@ function LoadingSkeleton() {
 }
 
 export default function BusManagementPage() {
-  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!schoolId) return;
-    const unsub = SupabaseService.subscribeByField<any>('analytics', schoolId, 'type', 'transport', (fbData) => {
-      if (fbData) {
-        setData(fbData);
-      } else {
-        setData(SAMPLE_DATA);
-        toast.info('Using sample transport data. Connect Supabase for live data.');
-      }
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [schoolId]);
+    fetch('/api/school-admin/bus-management')
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setData(json.data); })
+      .catch(() => setError('Failed to load data'))
+      .finally(() => setLoading(false));
+  }, []);
 
-  useEffect(() => {
-    if (!schoolId) return;
-    const timeout = setTimeout(() => {
-      if (loading) {
-        setData(SAMPLE_DATA);
-        setLoading(false);
-        toast.info('Using sample transport data. Connect Supabase for live data.');
-      }
-    }, 5000);
-    return () => clearTimeout(timeout);
-  }, [schoolId, loading]);
-
-  if (authLoading || loading) return <LoadingSkeleton />;
+  if (loading) return <LoadingSkeleton />;
   if (error) {
     return (
       <div className="space-y-6">
@@ -174,8 +106,8 @@ export default function BusManagementPage() {
             <AlertTriangle className="h-12 w-12 mb-4" />
             <h3 className="text-lg font-medium">Error loading data</h3>
             <p className="text-sm">{error}</p>
-            <Button variant="outline" className="mt-4" onClick={() => { setData(SAMPLE_DATA); setError(null); toast.info('Using sample data'); }}>
-              Use Sample Data
+            <Button variant="outline" className="mt-4" onClick={() => { window.location.reload(); }}>
+              Retry
             </Button>
           </CardContent>
         </Card>
@@ -183,11 +115,11 @@ export default function BusManagementPage() {
     );
   }
 
-  const stats = data || SAMPLE_DATA;
-  const buses = stats.buses || SAMPLE_DATA.buses;
-  const lateBuses = stats.lateBuses || SAMPLE_DATA.lateBuses;
-  const capacityUtilization = stats.capacityUtilization || SAMPLE_DATA.capacityUtilization;
-  const routeEfficiency = stats.routeEfficiency || SAMPLE_DATA.routeEfficiency;
+  const stats = data || {};
+  const buses = stats.buses || [];
+  const lateBuses = stats.lateBuses || [];
+  const capacityUtilization = stats.capacityUtilization || [];
+  const routeEfficiency = stats.routeEfficiency || [];
 
   const onlineCount = buses.filter((b: any) => b.gps === 'online').length;
   const activeCount = buses.filter((b: any) => b.status === 'active').length;

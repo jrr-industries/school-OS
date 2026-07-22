@@ -11,10 +11,8 @@ import {
   ArrowDownRight,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Button, cn } from '@schoolos/ui';
-import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
-import type { AnalyticsData } from '@/features/school-admin/types';
 import { PageHeader } from '@/features/school-admin/components/page-header';
+import { toast } from 'sonner';
 
 const dateRanges = [
   { label: '7 Days', value: '7d' },
@@ -108,8 +106,7 @@ const chartTooltipStyle = {
 };
 
 export default function AnalyticsPage() {
-  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
-  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('30d');
 
@@ -122,15 +119,14 @@ export default function AnalyticsPage() {
   const storageChartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!schoolId) return;
-    const unsub = SupabaseService.subscribeByField<AnalyticsData>('analytics', schoolId, 'school_id', schoolId, (analytics) => {
-      if (analytics) setData(analytics);
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [schoolId]);
+    fetch('/api/school-admin/analytics')
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setData(json.data); })
+      .catch(() => toast.error('Failed to load analytics'))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const isLoading = authLoading || loading;
+  const isLoading = loading;
 
   if (isLoading) {
     return (
@@ -163,11 +159,11 @@ export default function AnalyticsPage() {
     ? ((studentGrowth[studentGrowth.length - 1].count - studentGrowth[0].count) / studentGrowth[0].count * 100)
     : 0;
   const avgAttendance = attendanceTrend.length
-    ? attendanceTrend.reduce((s, d) => s + d.percentage, 0) / attendanceTrend.length
+    ? attendanceTrend.reduce((s: number, d: any) => s + d.percentage, 0) / attendanceTrend.length
     : 0;
-  const totalFee = feeCollection.reduce((s, d) => s + d.amount, 0);
+  const totalFee = feeCollection.reduce((s: number, d: any) => s + d.amount, 0);
   const avgActiveUsers = activeUsers.length
-    ? activeUsers.reduce((s, d) => s + d.count, 0) / activeUsers.length
+    ? activeUsers.reduce((s: number, d: any) => s + d.count, 0) / activeUsers.length
     : 0;
 
   return (
@@ -420,7 +416,7 @@ export default function AnalyticsPage() {
                     cx="50%" cy="50%" innerRadius={60} outerRadius={90}
                     paddingAngle={3} dataKey="size"
                   >
-                    {storageUsage.map((_, i) => (
+                    {storageUsage.map((_: any, i: number) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
@@ -428,12 +424,12 @@ export default function AnalyticsPage() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute flex flex-col items-center">
-                <span className="text-lg font-bold">{storageUsage.reduce((s, d) => s + d.size, 0).toFixed(1)}</span>
+                <span className="text-lg font-bold">{storageUsage.reduce((s: number, d: any) => s + d.size, 0).toFixed(1)}</span>
                 <span className="text-[10px] text-muted-foreground">Total GB</span>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap justify-center gap-3">
-              {storageUsage.map((entry, i) => (
+              {storageUsage.map((entry: any, i: number) => (
                 <div key={entry.category} className="flex items-center gap-1.5 text-xs">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                   <span className="text-muted-foreground">{entry.category}</span>

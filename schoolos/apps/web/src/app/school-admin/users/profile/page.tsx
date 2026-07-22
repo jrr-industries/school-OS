@@ -14,9 +14,6 @@ import {
   Button, Badge, Card, CardContent, CardHeader, CardTitle, Modal, Skeleton, cn
 } from '@schoolos/ui';
 import { PageHeader } from '@/features/school-admin/components/page-header';
-import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
-import type { SchoolAdminUser, AuditLogEntry } from '@/features/school-admin/types';
 
 const statusConfig: Record<string, { variant: 'success' | 'warning' | 'destructive' | 'info'; label: string }> = {
   active: { variant: 'success', label: 'Active' },
@@ -42,65 +39,66 @@ const roleLabels: Record<string, string> = {
 export default function UserProfilePage() {
   const searchParams = useSearchParams();
   const userId = searchParams.get('id');
-  const { schoolId } = useSchoolAdminAuth();
 
-  const [userData, setUserData] = useState<SchoolAdminUser | null>(null);
+  const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
   const [confirmAction, setConfirmAction] = useState<{ type: 'suspend' | 'activate' | 'reset' } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    if (!schoolId || !userId) {
+    if (!userId) {
       setLoading(false);
       setError('No user ID provided');
       return;
     }
 
     setLoading(true);
-    setError('');
 
-    const unsub = SupabaseService.subscribe<SchoolAdminUser>(
-      'users', userId,
-      (data) => {
-        if (data) {
-          setUserData(data);
-          setLoading(false);
-        } else {
-          setError('User not found');
-          setLoading(false);
+    fetch('/api/school-admin/users')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) {
+          const found = json.data.find((u: any) => u.id === userId);
+          if (found) {
+            setUserData(found);
+          } else {
+            setError('User not found');
+          }
         }
-      },
-    );
+      })
+      .catch(() => setError('Failed to load user'))
+      .finally(() => setLoading(false));
 
-    const unsubAudit = SupabaseService.subscribeList<AuditLogEntry>(
-      'auditLogs', schoolId,
-      (items) => {
-        setAuditLogs(items.filter((l) => l.targetUid === userId).slice(0, 20));
-      },
-    );
-
-    return () => {
-      unsub();
-      unsubAudit();
-    };
-  }, [schoolId, userId]);
+    fetch('/api/school-admin/audit-logs')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) {
+          setAuditLogs(json.data.filter((l: any) => l.targetUid === userId).slice(0, 20));
+        }
+      })
+      .catch(() => {});
+  }, [userId]);
 
   async function handleConfirmAction() {
-    if (!confirmAction || !schoolId || !userData) return;
+    if (!confirmAction || !userData) return;
     setActionLoading(true);
     try {
-      if (confirmAction.type === 'suspend') {
-        await SupabaseService.update('users', userData.uid, { status: 'suspended' });
-        toast.success('User suspended');
-      } else if (confirmAction.type === 'activate') {
-        await SupabaseService.update('users', userData.uid, { status: 'active' });
-        toast.success('User activated');
-      } else if (confirmAction.type === 'reset') {
-        await SupabaseService.update('users', userData.uid, { status: 'inactive' });
-        toast.success('Account reset successfully');
+      const status = confirmAction.type === 'suspend' ? 'suspended'
+        : confirmAction.type === 'activate' ? 'active' : 'inactive';
+      const res = await fetch('/api/school-admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userData.id, status }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`User ${confirmAction.type === 'suspend' ? 'suspended' : confirmAction.type === 'activate' ? 'activated' : 'reset'}`);
+        setUserData((prev: any) => ({ ...prev, status }));
+      } else {
+        toast.error(json.error || 'Action failed');
       }
     } catch {
       toast.error('Action failed');

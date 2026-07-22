@@ -16,10 +16,18 @@ export async function GET() {
     const settings = (school?.settings as Record<string, unknown>) ?? {};
     const facilitiesData = (settings.facilitiesData as Record<string, unknown>) ?? {};
 
+    const assets = (facilitiesData.assets as any[]) || (facilitiesData.facilities as any[]) || [];
+    const requests = (facilitiesData.requests as any[]) || (facilitiesData.maintenanceRequests as any[]) || [];
+
     return NextResponse.json({
       success: true,
       data: {
-        facilities: facilitiesData.facilities || [],
+        assets,
+        cctv: (facilitiesData.cctv as Record<string, unknown>) || { totalCameras: 0, activeCameras: 0, status: 'active' },
+        internet: (facilitiesData.internet as Record<string, unknown>) || { status: 'up', speed: '0 Mbps', provider: 'N/A' },
+        powerBackup: (facilitiesData.powerBackup as Record<string, unknown>) || { status: 'active', capacity: '0 kVA', lastTested: 'N/A' },
+        waterSupply: (facilitiesData.waterSupply as Record<string, unknown>) || { status: 'active', source: 'N/A', tankLevel: 0 },
+        requests,
         lastUpdated: new Date().toISOString(),
       },
     });

@@ -7,8 +7,6 @@ import {
   RefreshCw, Cake, Briefcase,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn, Skeleton, Button } from '@schoolos/ui';
-import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -80,50 +78,30 @@ const defaultCalendarData: CalendarData = {
 const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export default function CalendarPage() {
-  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
-  const [data, setData] = useState<CalendarData | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [filterType, setFilterType] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
-    if (!schoolId) return;
-
-    const unsub = SupabaseService.subscribeByField<CalendarData>(
-      'calendar', schoolId, 'school_id', schoolId,
-      (result) => {
-        if (result) {
-          setData(result);
-          setLoading(false);
-        } else {
-          setData(defaultCalendarData);
-          setLoading(false);
-        }
-      },
-    );
-
-    const timeout = setTimeout(() => {
-      if (loading) {
-        setData(defaultCalendarData);
-        setLoading(false);
-        toast.info('Using sample calendar data');
-      }
-    }, 5000);
-
-    return () => {
-      unsub();
-      clearTimeout(timeout);
-    };
-  }, [schoolId]);
+    fetch('/api/school-admin/calendar')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && json.data && json.data.events) setData(json.data);
+        else setData(defaultCalendarData);
+      })
+      .catch(() => toast.error('Failed to load calendar'))
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     if (error) toast.error(error);
   }, [error]);
 
-  if (authLoading) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <Skeleton variant="text" className="w-48 h-8" />
@@ -420,7 +398,7 @@ export default function CalendarPage() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {data!.holidays.map((holiday) => {
+                  {data!.holidays.map((holiday: any) => {
                     const d = new Date(holiday.date);
                     return (
                       <div key={holiday.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
@@ -461,7 +439,7 @@ export default function CalendarPage() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {data!.birthdays.map((b) => {
+                  {data!.birthdays.map((b: any) => {
                     const d = new Date(b.date);
                     return (
                       <div key={b.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">

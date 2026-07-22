@@ -10,12 +10,9 @@ import {
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
-  Button, Badge, Card, CardContent, CardHeader, CardTitle, Modal, cn, Skeleton
+  Button, Badge, Card, CardContent, CardHeader, CardTitle, Modal
 } from '@schoolos/ui';
 import { PageHeader } from '@/features/school-admin/components/page-header';
-import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
-import type { PrincipalData, AuditLogEntry, RecentActivity } from '@/features/school-admin/types';
 
 const statusConfig: Record<string, { variant: 'success' | 'info' | 'destructive' | 'warning'; label: string }> = {
   active: { variant: 'success', label: 'Active' },
@@ -26,77 +23,56 @@ const statusConfig: Record<string, { variant: 'success' | 'info' | 'destructive'
 
 export default function PrincipalDetailPage() {
   const params = useParams();
-  const { schoolId } = useSchoolAdminAuth();
-  const [principal, setPrincipal] = useState<PrincipalData | null>(null);
+  const [principal, setPrincipal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [loginHistory, setLoginHistory] = useState<AuditLogEntry[]>([]);
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
-
+  const [loginHistory, setLoginHistory] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [confirmAction, setConfirmAction] = useState<{ type: 'suspend' | 'activate' | 'reset' } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   const principalId = params.id as string;
 
   useEffect(() => {
-    if (!schoolId || !principalId) return;
-
+    if (!principalId) return;
     setLoading(true);
-    setError('');
 
-    const unsub = SupabaseService.subscribe<PrincipalData>(
-      'principals', principalId,
-      (data) => {
-        if (data) {
-          setPrincipal(data);
-          setLoading(false);
-        } else {
-          setError('Principal not found');
-          setLoading(false);
+    fetch('/api/school-admin/users')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) {
+          const found = json.data.find((u: any) => u.id === principalId);
+          if (found) {
+            setPrincipal(found);
+            const logins = found.lastLoginAt ? [{ id: '1', action: 'login', performedBy: found.name, timestamp: found.lastLoginAt }] : [];
+            setLoginHistory(logins);
+            setRecentActivity([]);
+          } else {
+            setError('Principal not found');
+          }
         }
-      },
-    );
-
-    const unsubLogins = SupabaseService.subscribeList<AuditLogEntry>(
-      'auditLogs', schoolId,
-      (items) => {
-        setLoginHistory(
-          items
-            .filter((l) => l.targetUid === principalId && l.action.toLowerCase().includes('login'))
-            .slice(0, 10),
-        );
-      },
-    );
-
-    const unsubActivity = SupabaseService.subscribeList<RecentActivity>(
-      'recentActivity', schoolId,
-      (items) => {
-        setRecentActivity(
-          items.filter((a) => a.user === principalId || a.target === principalId).slice(0, 10),
-        );
-      },
-    );
-
-    return () => {
-      unsub();
-      unsubLogins();
-      unsubActivity();
-    };
-  }, [schoolId, principalId]);
+      })
+      .catch(() => setError('Failed to load principal'))
+      .finally(() => setLoading(false));
+  }, [principalId]);
 
   async function handleConfirmAction() {
-    if (!confirmAction || !schoolId || !principal) return;
+    if (!confirmAction || !principal) return;
     setActionLoading(true);
     try {
-      if (confirmAction.type === 'suspend') {
-        await SupabaseService.update('principals', principal.id, { status: 'suspended' });
-        toast.success('Principal suspended');
-      } else if (confirmAction.type === 'activate') {
-        await SupabaseService.update('principals', principal.id, { status: 'active' });
-        toast.success('Principal activated');
-      } else if (confirmAction.type === 'reset') {
-        await SupabaseService.update('principals', principal.id, { status: 'invited' });
-        toast.success('Account reset successfully');
+      const status = confirmAction.type === 'suspend' ? 'suspended'
+        : confirmAction.type === 'activate' ? 'active' : 'invited';
+      const res = await fetch('/api/school-admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: principal.id, status }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`Principal ${confirmAction.type === 'suspend' ? 'suspended' : confirmAction.type === 'activate' ? 'activated' : 'reset'}`);
+        setPrincipal((prev: any) => ({ ...prev, status }));
+      } else {
+        toast.error(json.error || 'Action failed');
       }
     } catch {
       toast.error('Action failed');
@@ -121,12 +97,13 @@ export default function PrincipalDetailPage() {
           ]}
         />
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="space-y-6 lg:col-span-1">
-            <Card><CardContent className="pt-6"><Skeleton variant="rectangular" height={200} /></CardContent></Card>
-            <Card><CardContent className="pt-6"><Skeleton variant="rectangular" height={120} /></CardContent></Card>
+          <div className="lg:col-span-1 space-y-4">
+            <div className="h-64 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
+            <div className="h-32 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
           </div>
-          <div className="space-y-6 lg:col-span-2">
-            <Card><CardContent className="pt-6"><Skeleton variant="rectangular" height={300} /></CardContent></Card>
+          <div className="lg:col-span-2 space-y-4">
+            <div className="h-48 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
+            <div className="h-64 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
           </div>
         </div>
       </div>
@@ -138,6 +115,7 @@ export default function PrincipalDetailPage() {
       <div className="space-y-6">
         <PageHeader
           title="Principal Profile"
+          description="Error"
           breadcrumbs={[
             { label: 'Dashboard', href: '/school-admin/dashboard' },
             { label: 'Principals', href: '/school-admin/principals' },
@@ -145,13 +123,13 @@ export default function PrincipalDetailPage() {
           ]}
         />
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <AlertCircle className="h-12 w-12 text-destructive" />
-            <h3 className="mt-4 text-lg font-medium">Error Loading Principal</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{error || 'Principal not found'}</p>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+            <AlertCircle className="h-12 w-12 mb-4 text-red-500" />
+            <h2 className="text-lg font-semibold">Principal Not Found</h2>
+            <p className="mt-1 text-sm">{error || 'Unable to load principal data.'}</p>
             <Link href="/school-admin/principals">
-              <Button variant="outline" className="mt-4">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Principals
+              <Button variant="link" className="mt-4">
+                <ArrowLeft className="h-4 w-4 mr-1" /> Back to Principals
               </Button>
             </Link>
           </CardContent>
@@ -163,8 +141,8 @@ export default function PrincipalDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={principal.name}
-        description={`Principal • ${cfg?.label || principal.status}`}
+        title={`${principal.name}`}
+        description="Principal profile and account management"
         breadcrumbs={[
           { label: 'Dashboard', href: '/school-admin/dashboard' },
           { label: 'Principals', href: '/school-admin/principals' },
@@ -172,99 +150,84 @@ export default function PrincipalDetailPage() {
         ]}
         actions={
           <div className="flex items-center gap-2">
-            {principal.status !== 'suspended' ? (
-              <Button variant="outline" className="text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => setConfirmAction({ type: 'suspend' })}>
-                <ShieldOff className="mr-2 h-4 w-4" /> Suspend
+            {principal.status === 'active' ? (
+              <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => setConfirmAction({ type: 'suspend' })}>
+                <ShieldOff className="h-4 w-4" /> Suspend
               </Button>
             ) : (
-              <Button variant="outline" className="text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => setConfirmAction({ type: 'activate' })}>
-                <Shield className="mr-2 h-4 w-4" /> Activate
+              <Button variant="default" size="sm" className="gap-1.5" onClick={() => setConfirmAction({ type: 'activate' })}>
+                <Shield className="h-4 w-4" /> Activate
               </Button>
             )}
-            <Button variant="outline" onClick={() => setConfirmAction({ type: 'reset' })}>
-              <RotateCcw className="mr-2 h-4 w-4" /> Reset Account
-            </Button>
+            {principal.status !== 'invited' && (
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setConfirmAction({ type: 'reset' })}>
+                <RotateCcw className="h-4 w-4" /> Reset
+              </Button>
+            )}
           </div>
         }
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-1">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-            <Card className="hover:shadow-md transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center text-center">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-2xl font-bold text-primary">
-                    {principal.name.charAt(0).toUpperCase()}
-                  </div>
-                  <h2 className="mt-4 text-lg font-semibold">{principal.name}</h2>
-                  <p className="text-sm text-muted-foreground">Principal</p>
-                  {cfg && (
-                    <Badge variant={cfg.variant} className="mt-2">{cfg.label}</Badge>
-                  )}
-                  {principal.lastLogin && (
-                    <div className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      Last login: {new Date(principal.lastLogin).toLocaleDateString()}
-                    </div>
-                  )}
+        <div className="lg:col-span-1 space-y-4">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <Card>
+              <CardContent className="p-6 text-center">
+                <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
+                  <span className="text-2xl font-bold text-primary">
+                    {principal.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </span>
+                </div>
+                <h2 className="text-lg font-bold">{principal.name}</h2>
+                <p className="text-sm text-muted-foreground">Principal</p>
+                <div className="mt-3 flex justify-center gap-2">
+                  <Badge variant={cfg?.variant || 'outline'}>{cfg?.label || principal.status}</Badge>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader><CardTitle className="text-sm">Contact Information</CardTitle></CardHeader>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Contact</CardTitle>
+              </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <a href={`mailto:${principal.email}`} className="hover:underline">{principal.email}</a>
+                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="truncate">{principal.email}</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  {principal.phone ? (
-                    <a href={`tel:${principal.phone}`} className="hover:underline">{principal.phone}</a>
-                  ) : (
-                    <span className="text-muted-foreground">Not provided</span>
-                  )}
+                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span>{principal.phone || 'Not provided'}</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Created {new Date(principal.createdAt).toLocaleDateString()}</span>
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span>Joined {new Date(principal.createdAt).toLocaleDateString()}</span>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
         </div>
 
-        <div className="space-y-6 lg:col-span-2">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
-            <Card className="hover:shadow-md transition-shadow">
+        <div className="lg:col-span-2 space-y-4">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <Card>
               <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <LogIn className="h-4 w-4 text-muted-foreground" />
                   Login History
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {loginHistory.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <LogIn className="h-8 w-8 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">No login history available</p>
-                  </div>
+                  <p className="text-sm text-muted-foreground py-4 text-center">No login history available</p>
                 ) : (
-                  <div className="space-y-3">
-                    {loginHistory.map((entry) => (
-                      <div key={entry.id} className="flex items-start gap-3 rounded-lg border p-3 text-sm">
-                        <LogIn className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium">{entry.action}</p>
-                          {entry.details && <p className="text-xs text-muted-foreground">{entry.details}</p>}
-                        </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {new Date(entry.timestamp).toLocaleString()}
-                        </span>
+                  <div className="space-y-2">
+                    {loginHistory.map((entry: any, i: number) => (
+                      <div key={entry.id || i} className="flex items-center gap-3 text-sm">
+                        <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground">{new Date(entry.timestamp || entry.createdAt).toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
@@ -273,82 +236,56 @@ export default function PrincipalDetailPage() {
             </Card>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.3 }}>
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-muted-foreground" />
-                  Recent Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {recentActivity.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Activity className="h-8 w-8 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">No recent activity</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {recentActivity.map((entry) => (
-                      <div key={entry.id} className="flex items-start gap-3 rounded-lg border p-3 text-sm">
-                        <div className={cn(
-                          'mt-1 h-2 w-2 rounded-full shrink-0',
-                          entry.type === 'create' ? 'bg-emerald-500' :
-                          entry.type === 'update' ? 'bg-blue-500' :
-                          entry.type === 'delete' ? 'bg-red-500' :
-                          entry.type === 'login' ? 'bg-purple-500' :
-                          entry.type === 'suspend' ? 'bg-amber-500' :
-                          entry.type === 'activate' ? 'bg-emerald-500' :
-                          'bg-slate-400',
-                        )} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs">
-                            <span className="font-medium">{entry.user}</span>
-                            {' '}{entry.action}{' '}
-                            <span className="font-medium">{entry.target}</span>
-                          </p>
-                        </div>
-                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                          {new Date(entry.timestamp).toLocaleString()}
-                        </span>
+          {recentActivity.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                    Recent Activity
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {recentActivity.map((action: any, i: number) => (
+                      <div key={action.id || i} className="flex items-center justify-between py-1">
+                        <span className="text-sm">{action.action || action.description}</span>
+                        <span className="text-xs text-muted-foreground">{new Date(action.timestamp || action.createdAt).toLocaleDateString()}</span>
                       </div>
                     ))}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </div>
       </div>
 
-      <Modal
-        open={!!confirmAction}
-        onOpenChange={() => !actionLoading && setConfirmAction(null)}
-        title={
-          confirmAction?.type === 'suspend' ? 'Suspend Principal' :
-          confirmAction?.type === 'activate' ? 'Activate Principal' :
-          'Reset Account'
-        }
-      >
-        <div className="pt-2">
-          <p className="text-sm text-muted-foreground">
-            {confirmAction?.type === 'suspend'
-              ? `Are you sure you want to suspend ${principal.name}? They will lose access to the system.`
-              : confirmAction?.type === 'activate'
-              ? `Are you sure you want to activate ${principal.name}? They will regain access.`
-              : `Are you sure you want to reset ${principal.name}'s account? They will need to re-register.`}
-          </p>
-          <div className="mt-4 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setConfirmAction(null)} disabled={actionLoading}>Cancel</Button>
-            <Button
-              variant={confirmAction?.type === 'suspend' ? 'destructive' : 'default'}
-              onClick={handleConfirmAction}
-              disabled={actionLoading}
-            >
-              {actionLoading ? 'Processing...' : 'Confirm'}
-            </Button>
-          </div>
-        </div>
+      <Modal open={!!confirmAction} onOpenChange={(v) => !v && setConfirmAction(null)}>
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 space-y-4">
+            <h3 className="text-lg font-semibold">
+              {confirmAction?.type === 'suspend' ? 'Suspend Principal' :
+               confirmAction?.type === 'activate' ? 'Activate Principal' : 'Reset Account'}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {confirmAction?.type === 'suspend' ? 'This will suspend the principal\'s access to the system.' :
+               confirmAction?.type === 'activate' ? 'This will activate the principal\'s account.' :
+               'This will reset the principal\'s account and send a new invitation.'}
+            </p>
+            <p className="text-sm font-medium">Are you sure you want to proceed?</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
+              <Button
+                variant={confirmAction?.type === 'suspend' ? 'destructive' : 'default'}
+                onClick={handleConfirmAction}
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Processing...' : 'Confirm'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </Modal>
     </div>
   );

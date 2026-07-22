@@ -7,8 +7,6 @@ import {
   RefreshCw, UserCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn, Skeleton, Button } from '@schoolos/ui';
-import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -108,46 +106,26 @@ function SummaryCard({
 }
 
 export default function HrDashboardPage() {
-  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
-  const [data, setData] = useState<HrData | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!schoolId) return;
-
-    const unsub = SupabaseService.subscribeByField<HrData>(
-      'hr_analytics', schoolId, 'school_id', schoolId,
-      (result) => {
-        if (result) {
-          setData(result);
-          setLoading(false);
-        } else {
-          setData(defaultHrData);
-          setLoading(false);
-        }
-      },
-    );
-
-    const timeout = setTimeout(() => {
-      if (loading) {
-        setData(defaultHrData);
-        setLoading(false);
-        toast.info('Using sample HR data');
-      }
-    }, 5000);
-
-    return () => {
-      unsub();
-      clearTimeout(timeout);
-    };
-  }, [schoolId]);
+    fetch('/api/school-admin/hr-dashboard')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && Object.keys(json.data).length > 0) setData(json.data);
+        else setData(defaultHrData);
+      })
+      .catch(() => { setError('Failed to load data'); })
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     if (error) toast.error(error);
   }, [error]);
 
-  if (authLoading) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <Skeleton variant="text" className="w-48 h-8" />
@@ -236,7 +214,7 @@ export default function HrDashboardPage() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {data!.departments.map((dept) => {
+                  {data!.departments.map((dept: any) => {
                     const fillPct = dept.headCount > 0 ? Math.round((dept.count / dept.headCount) * 100) : 0;
                     return (
                       <div key={dept.department} className="flex items-center gap-4 py-2.5 first:pt-0 last:pb-0">
@@ -288,7 +266,7 @@ export default function HrDashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {data!.leaves.map((leave) => (
+                  {data!.leaves.map((leave: any) => (
                     <div key={leave.id} className="rounded-lg border p-3 text-sm">
                       <div className="flex items-center justify-between">
                         <p className="font-medium">{leave.staffName}</p>

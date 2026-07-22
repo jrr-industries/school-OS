@@ -11,9 +11,7 @@ import {
 } from '@schoolos/ui';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader } from '@/features/school-admin/components/page-header';
-import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
-import type { AuditLogEntry } from '@/features/school-admin/types';
+import { toast } from 'sonner';
 
 const ACTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   create: Plus,
@@ -65,8 +63,7 @@ function AuditLogSkeleton() {
 }
 
 export default function AuditLogsPage() {
-  const { schoolId } = useSchoolAdminAuth();
-  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -75,17 +72,16 @@ export default function AuditLogsPage() {
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    if (!schoolId) return;
-    const unsub = SupabaseService.subscribeList<AuditLogEntry>(
-      'auditLogs', schoolId,
-      (items) => {
-        setLogs(items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
-        setLoading(false);
-      },
-    );
-    return unsub;
-  }, [schoolId]);
+  const fetchLogs = async () => {
+    try {
+      const res = await fetch('/api/school-admin/audit-logs');
+      const json = await res.json();
+      if (json.success) setLogs(json.data);
+    } catch { toast.error('Failed to load audit logs'); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchLogs(); }, []);
 
   const filtered = useMemo(() => {
     return logs.filter((log) => {
