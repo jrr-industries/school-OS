@@ -1,83 +1,130 @@
 'use client';
 
-import { Clock } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
+import { useState, useEffect, useCallback } from 'react';
+import { Clock, Loader2, AlertCircle } from 'lucide-react';
 
-interface TrialSchool {
+interface Subscription {
   id: string;
-  school: string;
-  started: string;
-  endsIn: string;
-  daysRemaining: number;
-  status: 'active' | 'expiring' | 'expired';
+  schoolName: string;
+  planName: string;
+  status: string;
+  startsAt: string;
+  endsAt: string | null;
+  trialEndsAt: string | null;
 }
 
-const trialSchools: TrialSchool[] = [
-  { id: '1', school: 'Oakwood Preparatory', started: '2024-05-01', endsIn: '2024-05-31', daysRemaining: 10, status: 'active' },
-  { id: '2', school: 'Greenfield International', started: '2024-05-05', endsIn: '2024-06-04', daysRemaining: 14, status: 'active' },
-  { id: '3', school: 'North Star Academy', started: '2024-04-15', endsIn: '2024-05-15', daysRemaining: -6, status: 'expired' },
-  { id: '4', school: 'Pinecrest Elementary', started: '2024-04-28', endsIn: '2024-05-28', daysRemaining: 7, status: 'expiring' },
-  { id: '5', school: 'Horizon Learning Institute', started: '2024-05-10', endsIn: '2024-06-09', daysRemaining: 19, status: 'active' },
-];
-
-const statusStyles: Record<string, string> = {
-  active: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  expiring: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-  expired: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-};
-
 export default function TrialSchoolsPage() {
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/subscriptions?limit=50');
+      const data = await res.json();
+      if (!data.success) { setError(data.error); return; }
+      setSubscriptions((data.data ?? []).filter((s: Subscription) => s.status === 'trial'));
+    } catch {
+      setError('Network error');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  function daysRemaining(dateStr: string | null): number | null {
+    if (!dateStr) return null;
+    const diff = new Date(dateStr).getTime() - Date.now();
+    return Math.ceil(diff / 86400000);
+  }
+
+  function statusFromDays(days: number | null): { label: string; color: string } {
+    if (days === null) return { label: 'Unknown', color: 'bg-muted text-muted-foreground' };
+    if (days < 0) return { label: 'Expired', color: 'bg-red-500/10 text-red-600 dark:text-red-400' };
+    if (days <= 7) return { label: 'Expiring', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' };
+    return { label: 'Active', color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' };
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Trial Schools</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground">Trial Schools</h1>
         <p className="text-sm text-muted-foreground mt-1">Schools currently on a free trial</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Trial Schools ({trialSchools.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800">
-                  <th className="text-left font-medium py-3 px-4">School</th>
-                  <th className="text-left font-medium py-3 px-4">Started</th>
-                  <th className="text-left font-medium py-3 px-4">Ends In</th>
-                  <th className="text-left font-medium py-3 px-4">Days Remaining</th>
-                  <th className="text-right font-medium py-3 px-4">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trialSchools.map((trial) => (
-                  <tr key={trial.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0">
-                    <td className="py-3 px-4">
-                      <strong>{trial.school}</strong>
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground">{trial.started}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{trial.endsIn}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <Clock className={`h-4 w-4 ${trial.daysRemaining < 0 ? 'text-red-500' : trial.daysRemaining <= 7 ? 'text-amber-500' : 'text-muted-foreground'}`} />
-                        <span className={`font-medium ${trial.daysRemaining < 0 ? 'text-red-600' : ''}`}>
-                          {trial.daysRemaining < 0 ? 'Expired' : `${trial.daysRemaining} days`}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyles[trial.status]}`}>
-                        {trial.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {error && (
+        <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Loading trials...</span>
+        </div>
+      ) : (
+        <div className="rounded-xl border bg-card">
+          <div className="px-6 pb-3 pt-5">
+            <p className="text-sm font-semibold text-foreground">Trial Schools ({subscriptions.length})</p>
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            {subscriptions.length === 0 ? (
+              <p className="px-6 pb-5 text-sm text-muted-foreground">No trial subscriptions found.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left font-medium py-3 px-4 text-muted-foreground text-xs">School</th>
+                      <th className="text-left font-medium py-3 px-4 text-muted-foreground text-xs">Plan</th>
+                      <th className="text-left font-medium py-3 px-4 text-muted-foreground text-xs">Started</th>
+                      <th className="text-left font-medium py-3 px-4 text-muted-foreground text-xs">Trial Ends</th>
+                      <th className="text-left font-medium py-3 px-4 text-muted-foreground text-xs">Days Left</th>
+                      <th className="text-right font-medium py-3 px-4 text-muted-foreground text-xs">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subscriptions.map((sub) => {
+                      const days = daysRemaining(sub.trialEndsAt || sub.endsAt);
+                      const statusInfo = statusFromDays(days);
+                      return (
+                        <tr key={sub.id} className="border-b border-border/50 last:border-0 hover:bg-muted/50">
+                          <td className="py-3 px-4 font-medium text-foreground">{sub.schoolName}</td>
+                          <td className="py-3 px-4 text-muted-foreground">{sub.planName}</td>
+                          <td className="py-3 px-4 text-muted-foreground">
+                            {new Date(sub.startsAt).toLocaleDateString()}
+                          </td>
+                          <td className="py-3 px-4 text-muted-foreground">
+                            {sub.trialEndsAt ? new Date(sub.trialEndsAt).toLocaleDateString() : sub.endsAt ? new Date(sub.endsAt).toLocaleDateString() : '—'}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <Clock className={`h-4 w-4 ${days !== null && days < 0 ? 'text-red-500' : days !== null && days <= 7 ? 'text-amber-500' : 'text-muted-foreground'}`} />
+                              <span className={`font-medium ${days !== null && days < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
+                                {days !== null ? (days < 0 ? 'Expired' : `${days} days`) : '—'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusInfo.color}`}>
+                              {statusInfo.label}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

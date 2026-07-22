@@ -1,13 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, AlertCircle, CheckCircle2, Eye, EyeOff, School } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2, Eye, EyeOff, School, CreditCard, Loader2 } from 'lucide-react';
 
 interface CreateSchoolResult {
   school: { id: string; name: string; slug: string; type: string; status: string };
   admin: { id: string; name: string; email: string };
   credentials: { email: string; password: string };
+  plan: { id: string; name: string; price: number; currency: string; interval: string };
+}
+
+interface Plan {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  price: number;
+  currency: string;
+  interval: string;
+  isActive: boolean;
 }
 
 export default function CreateSchoolPage() {
@@ -16,6 +28,8 @@ export default function CreateSchoolPage() {
   const [error, setError] = useState('');
   const [result, setResult] = useState<CreateSchoolResult | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const [form, setForm] = useState({
     name: '',
     slug: '',
@@ -25,7 +39,25 @@ export default function CreateSchoolPage() {
     phone: '',
     adminName: '',
     adminEmail: '',
+    requireVerification: false,
+    planId: '',
   });
+
+  useEffect(() => {
+    fetch('/api/admin/subscriptions/plans')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          const active = (data.data ?? []).filter((p: Plan) => p.isActive);
+          setPlans(active);
+          if (active.length > 0) {
+            setForm((prev) => ({ ...prev, planId: active[0].id }));
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setPlansLoading(false));
+  }, []);
 
   function handleChange(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -78,7 +110,7 @@ export default function CreateSchoolPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-3">
               <h4 className="font-medium text-sm">School Details</h4>
               <div className="space-y-1 text-sm">
@@ -86,6 +118,19 @@ export default function CreateSchoolPage() {
                 <p><span className="text-muted-foreground">Slug:</span> <span className="font-medium">{result.school.slug}</span></p>
                 <p><span className="text-muted-foreground">Type:</span> <span className="font-medium capitalize">{result.school.type}</span></p>
                 <p><span className="text-muted-foreground">Status:</span> <span className="font-medium capitalize">{result.school.status}</span></p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <h4 className="font-medium text-sm">Subscription Plan</h4>
+              <div className="space-y-1 text-sm">
+                <p><span className="text-muted-foreground">Plan:</span> <span className="font-medium">{result.plan.name}</span></p>
+                <p>
+                  <span className="text-muted-foreground">Price:</span>{' '}
+                  <span className="font-medium">
+                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: result.plan.currency }).format(result.plan.price)}
+                  </span>
+                </p>
+                <p><span className="text-muted-foreground">Billing:</span> <span className="font-medium capitalize">{result.plan.interval}</span></p>
               </div>
             </div>
             <div className="space-y-3">
@@ -119,7 +164,7 @@ export default function CreateSchoolPage() {
             View All Schools
           </button>
           <button
-            onClick={() => { setResult(null); setForm({ name: '', slug: '', type: 'primary', address: '', email: '', phone: '', adminName: '', adminEmail: '' }); }}
+            onClick={() => { setResult(null); setForm({ name: '', slug: '', type: 'primary', address: '', email: '', phone: '', adminName: '', adminEmail: '', requireVerification: false, planId: plans[0]?.id || '' }); }}
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
           >
             Create Another
@@ -219,6 +264,22 @@ export default function CreateSchoolPage() {
                 </div>
               </div>
 
+              <div className="flex items-center gap-3 rounded-lg border border-amber-200/50 bg-amber-50/50 p-3 dark:border-amber-800/30 dark:bg-amber-950/20">
+                <input
+                  type="checkbox"
+                  id="requireVerification"
+                  checked={form.requireVerification}
+                  onChange={(e) => setForm((prev) => ({ ...prev, requireVerification: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                />
+                <label htmlFor="requireVerification" className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                  Require verification before activation
+                </label>
+                <p className="text-xs text-amber-600/70 dark:text-amber-500/70 ml-auto">
+                  School will start in trial status
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Address</label>
                 <textarea
@@ -229,6 +290,61 @@ export default function CreateSchoolPage() {
                   className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border bg-card">
+            <div className="border-b px-6 py-4">
+              <h2 className="font-semibold flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                Subscription Plan
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Select a plan for this school</p>
+            </div>
+            <div className="p-6">
+              {plansLoading ? (
+                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading plans...
+                </div>
+              ) : plans.length === 0 ? (
+                <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-950/20 dark:text-amber-400">
+                  No active plans available. Create a plan first in{' '}
+                  <a href="/admin/subscriptions/plans" className="font-medium underline">Subscription Plans</a>.
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {plans.map((plan) => {
+                    const selected = form.planId === plan.id;
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        onClick={() => setForm((prev) => ({ ...prev, planId: plan.id }))}
+                        className={`relative rounded-lg border p-4 text-left transition-all ${
+                          selected
+                            ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary'
+                            : 'border-input bg-background hover:border-primary/50 hover:bg-accent/50'
+                        }`}
+                      >
+                        {selected && (
+                          <div className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary">
+                            <CheckCircle2 className="h-3 w-3 text-white" />
+                          </div>
+                        )}
+                        <p className="font-semibold text-sm">{plan.name}</p>
+                        <p className="mt-1 font-mono text-lg font-bold">
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: plan.currency }).format(plan.price)}
+                        </p>
+                        <p className="text-xs text-muted-foreground capitalize">{plan.interval}</p>
+                        {plan.description && (
+                          <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">{plan.description}</p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -294,11 +410,15 @@ export default function CreateSchoolPage() {
           <div className="rounded-lg border bg-card p-6">
             <h3 className="font-semibold mb-2">What happens next?</h3>
             <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-              <li>School is created with <strong>Active</strong> status</li>
+              <li>School is created with <strong>{form.requireVerification ? 'Trial' : 'Active'}</strong> status</li>
+              <li>Selected plan is assigned to the school as a subscription</li>
               <li>Default roles are created (School Admin, Teacher, Staff, Parent, Student)</li>
               <li>School admin account is created with the <strong>School Admin</strong> role</li>
               <li>Admin can log in at <code className="font-mono text-xs">/login</code> with their email and default password</li>
               <li>Admin will be redirected to the School Admin dashboard</li>
+              {form.requireVerification && (
+                <li className="text-amber-600 dark:text-amber-400 font-medium">School requires admin approval before going active</li>
+              )}
             </ol>
           </div>
 

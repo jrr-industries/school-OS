@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { PageHeader, DataTable } from '@/features/super-admin/components';
-import { Plus, Edit, Eye, MoreHorizontal, Loader2, AlertCircle, Search } from 'lucide-react';
+import { Plus, Edit, Eye, Loader2, AlertCircle, Search } from 'lucide-react';
 import { Button } from '@schoolos/ui';
 
 interface SchoolRow {
@@ -165,17 +165,14 @@ export default function SchoolsPage() {
             keyExtractor={(row: SchoolRow) => row.id}
             searchKey="name"
             selectable
-            rowActions={() => (
+            rowActions={(row: SchoolRow) => (
               <div className="flex items-center justify-end gap-1">
-                <button className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="View">
+                <Link href={`/admin/schools/${row.id}`} className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800 inline-flex" aria-label="View">
                   <Eye className="h-4 w-4" />
-                </button>
-                <button className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Edit">
+                </Link>
+                <Link href={`/admin/schools/${row.id}/edit`} className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800 inline-flex" aria-label="Edit">
                   <Edit className="h-4 w-4" />
-                </button>
-                <button className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="More actions">
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
+                </Link>
               </div>
             )}
             pagination={{

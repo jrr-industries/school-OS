@@ -1,7 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, AlertCircle } from 'lucide-react';
+import {
+  Search,
+  AlertCircle,
+  Trash2,
+  Loader2,
+  X,
+} from 'lucide-react';
 import { PageHeader, DataTable } from '@/features/super-admin/components';
 import type { Column } from '@/features/super-admin/components/SearchFilter';
 
@@ -43,6 +49,12 @@ export default function UsersPage() {
   const [total, setTotal] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Kick modal state
+  const [showKickModal, setShowKickModal] = useState(false);
+  const [kickTarget, setKickTarget] = useState<PlatformUser | null>(null);
+  const [kicking, setKicking] = useState(false);
+  const [kickError, setKickError] = useState('');
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -81,6 +93,29 @@ export default function UsersPage() {
       setSearch(value);
       setPage(1);
     }, 400);
+  };
+
+  const handleKick = async () => {
+    if (!kickTarget) return;
+    setKicking(true);
+    setKickError('');
+    try {
+      const res = await fetch(`/api/admin/users/${kickTarget.id}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setKickError(json.error || 'Failed to remove user');
+        return;
+      }
+      setShowKickModal(false);
+      setKickTarget(null);
+      fetchUsers();
+    } catch {
+      setKickError('Network error');
+    } finally {
+      setKicking(false);
+    }
   };
 
   const formatDate = (date: string | null) => {
@@ -186,6 +221,17 @@ export default function UsersPage() {
         keyExtractor={(row) => row.id}
         loading={loading}
         emptyMessage="No users found."
+        rowActions={(row) =>
+          row.isSuperAdmin ? null : (
+            <button
+              onClick={() => { setKickTarget(row); setShowKickModal(true); }}
+              className="inline-flex items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 py-1.5 text-xs font-medium text-red-500 transition-colors hover:bg-red-500/20"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Kick
+            </button>
+          )
+        }
         pagination={{
           page,
           pageSize: 10,
@@ -194,6 +240,90 @@ export default function UsersPage() {
           onPageSizeChange: () => {},
         }}
       />
+
+      {/* Kick Confirmation Modal */}
+      {showKickModal && kickTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !kicking && setShowKickModal(false)} />
+          <div className="relative w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                  <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Remove User</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowKickModal(false)}
+                disabled={kicking}
+                className="rounded-md p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+              <div className="space-y-1 text-sm">
+                <p>
+                  <span className="text-slate-500 dark:text-slate-400">Name:</span>{' '}
+                  <span className="font-medium text-slate-900 dark:text-slate-100">{kickTarget.name || 'Unnamed'}</span>
+                </p>
+                <p>
+                  <span className="text-slate-500 dark:text-slate-400">Email:</span>{' '}
+                  <span className="font-medium text-slate-900 dark:text-slate-100">{kickTarget.email}</span>
+                </p>
+                <p>
+                  <span className="text-slate-500 dark:text-slate-400">School:</span>{' '}
+                  <span className="font-medium text-slate-900 dark:text-slate-100">{kickTarget.schoolName || '-'}</span>
+                </p>
+                <p>
+                  <span className="text-slate-500 dark:text-slate-400">Status:</span>{' '}
+                  <span className="font-medium capitalize text-slate-900 dark:text-slate-100">{kickTarget.status}</span>
+                </p>
+              </div>
+            </div>
+
+            {kickError && (
+              <div className="mt-3 flex items-center gap-2 rounded-md bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-400">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{kickError}</span>
+              </div>
+            )}
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => setShowKickModal(false)}
+                disabled={kicking}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleKick}
+                disabled={kicking}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {kicking ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Removing...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    Confirm Remove
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

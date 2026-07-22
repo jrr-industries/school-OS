@@ -1,86 +1,149 @@
 'use client';
 
-import { AlertTriangle, RotateCcw, Eye } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
+import { useState, useEffect, useCallback } from 'react';
+import { AlertTriangle, RotateCcw, Eye, Loader2, ShieldCheck } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent, Button, Badge } from '@schoolos/ui';
+import Link from 'next/link';
 
 interface SuspendedSchool {
   id: string;
   name: string;
-  code: string;
-  suspendedDate: string;
-  reason: string;
+  slug: string;
+  status: string;
+  email: string | null;
+  updatedAt: string;
 }
 
-const suspendedSchools: SuspendedSchool[] = [
-  { id: '1', name: 'Mountain View Middle', code: 'MTN-MID', suspendedDate: '2024-03-15', reason: 'Non-payment of subscription fees for 90+ days' },
-  { id: '2', name: 'Westside Academy', code: 'WST-ACA', suspendedDate: '2024-04-02', reason: 'Violation of platform terms of service' },
-  { id: '3', name: 'Bright Future School', code: 'BRT-FTR', suspendedDate: '2024-04-20', reason: 'Failure to comply with data security requirements' },
-  { id: '4', name: 'Harmony Institute', code: 'HRM-INS', suspendedDate: '2024-05-01', reason: 'Repeated non-compliance with reporting standards' },
-];
-
 export default function SuspendedSchoolsPage() {
+  const [schools, setSchools] = useState<SuspendedSchool[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
+  const fetchSchools = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/schools?limit=100');
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.error ?? 'Failed to load');
+        return;
+      }
+      setSchools((data.data ?? []).filter((s: SuspendedSchool) => s.status === 'suspended'));
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchSchools(); }, [fetchSchools]);
+
+  const handleReactivate = async (school: SuspendedSchool) => {
+    setProcessingId(school.id);
+    try {
+      const res = await fetch(`/api/admin/schools/${school.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'active' }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      setSchools((prev) => prev.filter((s) => s.id !== school.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reactivate');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Suspended Schools</h1>
-        <p className="text-sm text-muted-foreground mt-1">Schools that have been suspended</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Suspended Schools</h1>
+          <p className="text-sm text-muted-foreground mt-1">Schools that have been suspended</p>
+        </div>
+        {!loading && <Badge variant="destructive">{schools.length} suspended</Badge>}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Suspended Schools ({suspendedSchools.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800">
-                  <th className="text-left font-medium py-3 px-4">School</th>
-                  <th className="text-left font-medium py-3 px-4">Code</th>
-                  <th className="text-left font-medium py-3 px-4">Suspended Date</th>
-                  <th className="text-left font-medium py-3 px-4">Reason</th>
-                  <th className="text-right font-medium py-3 px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {suspendedSchools.map((school) => (
-                  <tr key={school.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0">
-                    <td className="py-3 px-4">
-                      <strong>{school.name}</strong>
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground">{school.code}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{school.suspendedDate}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                        <span className="text-muted-foreground">{school.reason}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent"
-                          aria-label="View details"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          View
-                        </button>
-                        <button
-                          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
-                          aria-label="Reactivate"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          Reactivate
-                        </button>
-                      </div>
-                    </td>
+      {error && (
+        <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
+        </div>
+      ) : schools.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <ShieldCheck className="mb-4 h-12 w-12 text-muted-foreground" />
+          <h3 className="text-lg font-semibold">No suspended schools</h3>
+          <p className="text-sm text-muted-foreground">There are no suspended schools at this time</p>
+        </div>
+      ) : (
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Suspended Schools ({schools.length})</CardTitle></CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left font-medium py-3 px-4">School</th>
+                    <th className="text-left font-medium py-3 px-4">Status</th>
+                    <th className="text-left font-medium py-3 px-4">Last Updated</th>
+                    <th className="text-right font-medium py-3 px-4">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                </thead>
+                <tbody>
+                  {schools.map((school) => (
+                    <tr key={school.id} className="border-b last:border-0">
+                      <td className="py-3 px-4">
+                        <strong>{school.name}</strong>
+                        <p className="text-xs text-muted-foreground">{school.slug}</p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                          <span className="text-muted-foreground">Suspended</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {new Date(school.updatedAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={`/admin/schools/${school.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            View
+                          </Link>
+                          <Button
+                            size="sm"
+                            onClick={() => handleReactivate(school)}
+                            disabled={processingId === school.id}
+                            className="gap-1.5"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Reactivate
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

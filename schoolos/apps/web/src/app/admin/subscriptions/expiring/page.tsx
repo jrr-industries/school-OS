@@ -1,88 +1,123 @@
 'use client';
 
-import { Clock, RefreshCw, Eye } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
+import { useState, useEffect, useCallback } from 'react';
+import { Clock, RefreshCw, Loader2, AlertCircle } from 'lucide-react';
 
-interface ExpiringSubscription {
+interface Subscription {
   id: string;
-  school: string;
-  plan: string;
-  expiryDate: string;
-  daysLeft: number;
+  schoolName: string;
+  planName: string;
+  status: string;
+  endsAt: string | null;
   autoRenew: boolean;
 }
 
-const expiringSubscriptions: ExpiringSubscription[] = [
-  { id: '1', school: 'Springfield Elementary', plan: 'Pro', expiryDate: '2024-06-15', daysLeft: 5, autoRenew: true },
-  { id: '2', school: 'Westside Academy', plan: 'Basic', expiryDate: '2024-06-20', daysLeft: 10, autoRenew: false },
-  { id: '3', school: 'Bright Future School', plan: 'Pro', expiryDate: '2024-07-01', daysLeft: 21, autoRenew: true },
-  { id: '4', school: 'Harmony Institute', plan: 'Enterprise', expiryDate: '2024-07-10', daysLeft: 30, autoRenew: true },
-  { id: '5', school: 'Sunrise Learning Center', plan: 'Basic', expiryDate: '2024-06-25', daysLeft: 15, autoRenew: false },
-];
-
 export default function ExpiringSubscriptionsPage() {
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/subscriptions?limit=100');
+      const data = await res.json();
+      if (!data.success) { setError(data.error); return; }
+      const now = new Date();
+      const thirtyDaysFromNow = new Date(now.getTime() + 30 * 86400000);
+      const expiring = (data.data ?? []).filter((s: Subscription) => {
+        if (!s.endsAt) return false;
+        const end = new Date(s.endsAt);
+        return end >= now && end <= thirtyDaysFromNow;
+      });
+      setSubscriptions(expiring);
+    } catch {
+      setError('Network error');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  function daysLeft(dateStr: string): number {
+    return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Expiring Soon</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground">Expiring Soon</h1>
         <p className="text-sm text-muted-foreground mt-1">Subscriptions that will expire within 30 days</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Expiring Subscriptions ({expiringSubscriptions.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800">
-                  <th className="text-left font-medium py-3 px-4">School</th>
-                  <th className="text-left font-medium py-3 px-4">Plan</th>
-                  <th className="text-left font-medium py-3 px-4">Expiry Date</th>
-                  <th className="text-left font-medium py-3 px-4">Days Left</th>
-                  <th className="text-left font-medium py-3 px-4">Auto-renew</th>
-                  <th className="text-right font-medium py-3 px-4">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expiringSubscriptions.map((sub) => (
-                  <tr key={sub.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0">
-                    <td className="py-3 px-4">
-                      <strong>{sub.school}</strong>
-                    </td>
-                    <td className="py-3 px-4">{sub.plan}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{sub.expiryDate}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <Clock className={`h-4 w-4 ${sub.daysLeft <= 7 ? 'text-red-500' : 'text-amber-500'}`} />
-                        <span className={`font-medium ${sub.daysLeft <= 7 ? 'text-red-600' : ''}`}>
-                          {sub.daysLeft} days
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1.5">
-                        <RefreshCw className={`h-3.5 w-3.5 ${sub.autoRenew ? 'text-emerald-500' : 'text-muted-foreground'}`} />
-                        <span className="text-muted-foreground">{sub.autoRenew ? 'On' : 'Off'}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent"
-                        aria-label="View details"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {error && (
+        <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Loading subscriptions...</span>
+        </div>
+      ) : (
+        <div className="rounded-xl border bg-card">
+          <div className="px-6 pb-3 pt-5">
+            <p className="text-sm font-semibold text-foreground">Expiring Subscriptions ({subscriptions.length})</p>
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            {subscriptions.length === 0 ? (
+              <p className="px-6 pb-5 text-sm text-muted-foreground">No subscriptions expiring in the next 30 days.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left font-medium py-3 px-4 text-muted-foreground text-xs">School</th>
+                      <th className="text-left font-medium py-3 px-4 text-muted-foreground text-xs">Plan</th>
+                      <th className="text-left font-medium py-3 px-4 text-muted-foreground text-xs">Expiry Date</th>
+                      <th className="text-left font-medium py-3 px-4 text-muted-foreground text-xs">Days Left</th>
+                      <th className="text-left font-medium py-3 px-4 text-muted-foreground text-xs">Auto-renew</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subscriptions.map((sub) => {
+                      const days = daysLeft(sub.endsAt!);
+                      return (
+                        <tr key={sub.id} className="border-b border-border/50 last:border-0 hover:bg-muted/50">
+                          <td className="py-3 px-4 font-medium text-foreground">{sub.schoolName}</td>
+                          <td className="py-3 px-4 text-muted-foreground">{sub.planName}</td>
+                          <td className="py-3 px-4 text-muted-foreground">
+                            {new Date(sub.endsAt!).toLocaleDateString()}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <Clock className={`h-4 w-4 ${days <= 7 ? 'text-red-500' : 'text-amber-500'}`} />
+                              <span className={`font-medium ${days <= 7 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
+                                {days} days
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-1.5">
+                              <RefreshCw className={`h-3.5 w-3.5 ${sub.autoRenew ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`} />
+                              <span className="text-muted-foreground">{sub.autoRenew ? 'On' : 'Off'}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

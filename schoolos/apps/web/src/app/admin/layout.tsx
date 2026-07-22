@@ -20,7 +20,7 @@ import {
   FileText,
   DollarSign,
   Users,
-  UserPlus,
+
   UserCog,
   Shield,
   ShieldAlert,
@@ -126,6 +126,7 @@ const navSections: NavSection[] = [
       { label: 'Billing', href: '/admin/subscriptions/billing', icon: DollarSign },
       { label: 'Invoices', href: '/admin/subscriptions/invoices', icon: FileText },
       { label: 'Payments', href: '/admin/subscriptions/payments', icon: Receipt },
+      { label: 'Payment Setup', href: '/admin/subscriptions/payment-setup', icon: CreditCard },
     ],
   },
   {
@@ -133,10 +134,8 @@ const navSections: NavSection[] = [
     icon: Users,
     items: [
       { label: 'Users', href: '/admin/users', icon: Users },
-      { label: 'Invite User', href: '/admin/users/invite', icon: UserPlus },
       { label: 'Roles', href: '/admin/users/roles', icon: UserCog },
       { label: 'Permissions', href: '/admin/users/permissions', icon: Shield },
-      { label: 'Teams', href: '/admin/users/teams', icon: Box },
     ],
   },
   {

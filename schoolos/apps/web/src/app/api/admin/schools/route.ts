@@ -68,11 +68,26 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, slug, type, address, email, phone, adminName, adminEmail } = body;
+    const { name, slug, type, address, email, phone, adminName, adminEmail, requireVerification, planId } = body;
 
     if (!name || !slug || !type || !adminName || !adminEmail) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields: name, slug, type, adminName, adminEmail' },
+        { status: 400 },
+      );
+    }
+
+    if (!planId) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required field: planId. Select a subscription plan.' },
+        { status: 400 },
+      );
+    }
+
+    const plan = await prisma.subscriptionPlan.findUnique({ where: { id: planId } });
+    if (!plan || !plan.isActive) {
+      return NextResponse.json(
+        { success: false, error: 'Selected plan not found or inactive' },
         { status: 400 },
       );
     }
@@ -106,7 +121,19 @@ export async function POST(request: Request) {
         address: address || null,
         email: email || null,
         phone: phone || null,
-        status: 'active',
+        status: requireVerification ? 'trial' : 'active',
+        createdBy: adminUserRecord?.id ?? undefined,
+      },
+    });
+
+    await prisma.subscription.create({
+      data: {
+        schoolId: school.id,
+        planId: plan.id,
+        status: requireVerification ? 'trial' : 'active',
+        startsAt: new Date(),
+        trialEndsAt: requireVerification ? new Date(Date.now() + 30 * 86400000) : null,
+        autoRenew: true,
         createdBy: adminUserRecord?.id ?? undefined,
       },
     });
@@ -201,6 +228,13 @@ export async function POST(request: Request) {
         credentials: {
           email: adminUser.email,
           password: 'Admin@123',
+        },
+        plan: {
+          id: plan.id,
+          name: plan.name,
+          price: Number(plan.price),
+          currency: plan.currency,
+          interval: plan.interval,
         },
         roles: roles.map((r) => ({
           id: r.id,
