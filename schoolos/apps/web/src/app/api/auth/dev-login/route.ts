@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { DevAuthService } from '@/features/auth/services/dev-auth.service';
-import { createDevSession } from '@/lib/dev-session';
+import { createDevSession, setDevSessionCookie } from '@/lib/dev-session';
 
 export async function HEAD() {
   if (process.env.NODE_ENV !== 'development') {
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     const authService = new DevAuthService();
     const session = await authService.login({ email, password });
 
-    await createDevSession(session);
+    const token = await createDevSession(session);
 
     const response = NextResponse.json({
       success: true,
@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+    setDevSessionCookie(response, token);
 
     return response;
   } catch (error) {

@@ -63,7 +63,7 @@ export function SchoolAdminAuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/dev-logout', { method: 'POST' });
     } catch {
     }
     setUser(null);

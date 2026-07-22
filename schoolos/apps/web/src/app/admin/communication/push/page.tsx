@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { Bell, Send, Smartphone, Loader2, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { Bell, Send, Smartphone, Loader2, AlertCircle } from 'lucide-react';
 
 interface PushItem {
   id: string;

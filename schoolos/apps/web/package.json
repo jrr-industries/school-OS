@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:socket": "node socket-server.js",
+    "dev:all": "powershell -NoProfile -Command \"$s=Start-Process -NoNewWindow -PassThru node 'socket-server.js'; try { next dev } finally { $s.Kill() }\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -36,6 +38,8 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.2",
     "recharts": "^3.9.2",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.6.0",
     "zod": "^3.24.1",

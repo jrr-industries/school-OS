@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createDevSession } from '@/lib/dev-session';
+import { createDevSession, setDevSessionCookie } from '@/lib/dev-session';
 import { prisma } from '@schoolos/database';
 
 const ROLE_MAP: Record<string, { role: 'SUPER_ADMIN' | 'SCHOOL_ADMIN' | 'TEACHER' | 'STAFF' | 'PARENT' | 'STUDENT'; label: string; devEmail: string }> = {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     const roleConfig = ROLE_MAP[roleSlug];
 
     if (roleConfig.role === 'SUPER_ADMIN') {
-      await createDevSession({
+      const token = await createDevSession({
         id: 'dev-super-admin-001',
         email: 'admin@schoolos.dev',
         name: 'Super Admin',
@@ -43,10 +43,12 @@ export async function POST(request: NextRequest) {
         authenticated: true,
       });
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         data: { redirect: '/admin/dashboard' },
       });
+      setDevSessionCookie(response, token);
+      return response;
     }
 
     const targetSchoolId = schoolId || (await getFirstSchoolId());
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await createDevSession({
+    const token = await createDevSession({
       id: `dev-${roleSlug}-001`,
       email: roleConfig.devEmail,
       name: roleConfig.label,
@@ -88,10 +90,12 @@ export async function POST(request: NextRequest) {
       student: '/school-admin/dashboard',
     };
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: { redirect: redirectMap[roleSlug] || '/school-admin/dashboard' },
     });
+    setDevSessionCookie(response, token);
+    return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Quick login failed';
     return NextResponse.json({ success: false, error: message }, { status: 500 });

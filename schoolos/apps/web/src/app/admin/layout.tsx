@@ -104,6 +104,16 @@ const navSections: NavSection[] = [
     items: [{ label: 'Overview', href: '/admin/dashboard', icon: LayoutDashboard }],
   },
   {
+    title: 'Role Dashboards',
+    icon: LayoutDashboard,
+    items: [
+      { label: 'Teacher Dashboard', href: '/dashboard/teacher', icon: Users },
+      { label: 'Principal Dashboard', href: '/dashboard/principal', icon: Users },
+      { label: 'Vice Principal Dashboard', href: '/dashboard/vice-principal', icon: Users },
+      { label: 'Live Bus Tracker', href: '/dashboard/bus-tracker', icon: Users },
+    ],
+  },
+  {
     title: 'School Management',
     icon: Building2,
     items: [
@@ -151,6 +161,7 @@ const navSections: NavSection[] = [
     title: 'Communication',
     icon: Megaphone,
     items: [
+      { label: 'Chat', href: '/admin/communication/chat', icon: MessageSquare },
       { label: 'Announcements', href: '/admin/communication/announcements', icon: Megaphone },
       { label: 'Notifications', href: '/admin/communication/notifications', icon: Bell },
       { label: 'Email Campaigns', href: '/admin/communication/email-campaigns', icon: Mail },

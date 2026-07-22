@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { Mail, Plus, Loader2, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { Mail, Plus, Loader2, AlertCircle } from 'lucide-react';
 
 interface CampaignItem {
   id: string;

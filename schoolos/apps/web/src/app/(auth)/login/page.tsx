@@ -31,6 +31,7 @@ function DevLoginPage() {
   useEffect(() => {
     if (searchParams.get('error') === 'access_denied') {
       setError('Access denied. You do not have permission to access that page.');
+      fetch('/api/auth/dev-logout', { method: 'POST' }).catch(() => {});
     }
   }, [searchParams]);
 
@@ -82,6 +83,14 @@ function DevLoginPage() {
               <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={() => { setError(''); }}
+                  className="ml-auto shrink-0 text-destructive/70 hover:text-destructive"
+                  title="Dismiss"
+                >
+                  &times;
+                </button>
               </div>
             )}
 

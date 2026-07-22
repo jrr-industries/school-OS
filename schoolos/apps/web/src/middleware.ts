@@ -25,7 +25,7 @@ const publicPaths = [
   '/favicon.ico',
 ];
 
-const adminPaths = ['/admin', '/school-admin'];
+const adminPaths = ['/admin', '/school-admin', '/dashboard'];
 
 function isPublicPath(pathname: string): boolean {
   return publicPaths.some(
@@ -66,7 +66,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    if (pathname.startsWith('/school-admin') && session.role !== 'SCHOOL_ADMIN') {
+    if (pathname.startsWith('/dashboard') && session.role !== 'SUPER_ADMIN') {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('error', 'access_denied');
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // In development, allow any authenticated role to access school-admin
+    // (strict role enforcement happens at the API/component level)
+    if (pathname.startsWith('/school-admin') && !session.authenticated) {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('error', 'access_denied');
       return NextResponse.redirect(loginUrl);

@@ -5,6 +5,7 @@
 // ============================================================
 
 import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 import type { DevSession } from '@/features/auth/types';
 
 const COOKIE_NAME = 'dev_session';
@@ -40,11 +41,25 @@ async function verifyToken(token: string): Promise<string | null> {
   }
 }
 
-export async function createDevSession(session: DevSession): Promise<void> {
+export async function createDevSession(session: DevSession): Promise<string> {
   const cookieStore = await cookies();
   const token = await signToken(JSON.stringify(session));
 
   cookieStore.set(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24,
+  });
+  return token;
+}
+
+export function setDevSessionCookie(
+  response: NextResponse,
+  token: string,
+): void {
+  response.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
