@@ -1,7 +1,6 @@
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
-const crypto = require('crypto');
 
 const prisma = new PrismaClient();
 const httpServer = createServer();
@@ -13,19 +12,21 @@ const io = new Server(httpServer, {
 });
 
 const DEV_SECRET = 'schoolos-dev-secret-key-do-not-use-in-production';
+const subtle = globalThis.crypto.subtle;
 
 async function verifyToken(token) {
   try {
     const [encodedPayload, signature] = token.split('.');
     if (!encodedPayload || !signature) return null;
-    const key = await crypto.subtle.importKey(
+
+    const key = await subtle.importKey(
       'raw',
       new TextEncoder().encode(DEV_SECRET),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['sign'],
     );
-    const expectedSigBuffer = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(encodedPayload));
+    const expectedSigBuffer = await subtle.sign('HMAC', key, new TextEncoder().encode(encodedPayload));
     const expectedSig = Buffer.from(expectedSigBuffer).toString('base64');
     if (signature !== expectedSig) return null;
     const payload = Buffer.from(encodedPayload, 'base64').toString();
@@ -42,10 +43,36 @@ io.use(async (socket, next) => {
   const session = await verifyToken(token);
   if (!session) return next(new Error('Invalid session'));
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.id },
-    select: { id: true, name: true, email: true, isSuperAdmin: true, schoolId: true },
-  });
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: session.id },
+      select: { id: true, name: true, email: true, isSuperAdmin: true, schoolId: true },
+    });
+  } catch {
+    // session.id might not be a UUID (e.g., dev session id before socket-token was used)
+  }
+  if (!user) {
+    // Fallback: try to find or create user by email (same logic as resolveDevUser)
+    try {
+      user = await prisma.user.findUnique({ where: { email: session.email } });
+      if (!user) {
+        const school = await prisma.school.findFirst({ where: { deletedAt: null }, select: { id: true } });
+        if (school) {
+          user = await prisma.user.create({
+            data: {
+              schoolId: school.id,
+              email: session.email,
+              name: session.name,
+              status: 'active',
+              isSuperAdmin: session.role === 'SUPER_ADMIN',
+            },
+            select: { id: true, name: true, email: true, isSuperAdmin: true, schoolId: true },
+          });
+        }
+      }
+    } catch {}
+  }
   if (!user) return next(new Error('User not found'));
 
   const role = user.isSuperAdmin ? 'SUPER_ADMIN' : 'SCHOOL_ADMIN';
@@ -55,7 +82,7 @@ io.use(async (socket, next) => {
 
 io.on('connection', (socket) => {
   const user = socket.data.user;
-  console.log(`[chat] ${user.name} (${user.role}) connected`);
+  console.log(`[chat] ${user.name} (${user.role}) connected (socket=${socket.id})`);
 
   socket.join(`user:${user.id}`);
 
@@ -78,15 +105,6 @@ io.on('connection', (socket) => {
 
       const participant = await prisma.chatConversationParticipant.findUnique({
         where: { conversationId_userId: { conversationId, userId: user.id } },
-        include: {
-          conversation: {
-            include: {
-              participants: {
-                include: { user: { select: { id: true, name: true, email: true } } },
-              },
-            },
-          },
-        },
       });
       if (!participant) return callback?.({ error: 'Not a participant' });
 

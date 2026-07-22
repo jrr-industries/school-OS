@@ -47,12 +47,7 @@ import {
   HardDrive,
   Layers,
   Terminal,
-  Lock,
-  Fingerprint,
-  Key as KeyIcon,
   Webhook,
-  WifiOff,
-  Gauge,
   PlugZap,
   Mailbox,
   Smartphone,
@@ -102,16 +97,6 @@ const navSections: NavSection[] = [
     title: 'Dashboard',
     icon: LayoutDashboard,
     items: [{ label: 'Overview', href: '/admin/dashboard', icon: LayoutDashboard }],
-  },
-  {
-    title: 'Role Dashboards',
-    icon: LayoutDashboard,
-    items: [
-      { label: 'Teacher Dashboard', href: '/dashboard/teacher', icon: Users },
-      { label: 'Principal Dashboard', href: '/dashboard/principal', icon: Users },
-      { label: 'Vice Principal Dashboard', href: '/dashboard/vice-principal', icon: Users },
-      { label: 'Live Bus Tracker', href: '/dashboard/bus-tracker', icon: Users },
-    ],
   },
   {
     title: 'School Management',
@@ -214,18 +199,6 @@ const navSections: NavSection[] = [
       { label: 'Cache', href: '/admin/system/cache', icon: Layers },
       { label: 'Logs', href: '/admin/system/logs', icon: Terminal },
       { label: 'Backup', href: '/admin/system/backup', icon: DatabaseBackup },
-    ],
-  },
-  {
-    title: 'Security',
-    icon: Lock,
-    items: [
-      { label: 'Sessions', href: '/admin/security/sessions', icon: KeyRound },
-      { label: 'MFA', href: '/admin/security/mfa', icon: Fingerprint },
-      { label: 'API Keys', href: '/admin/security/api-keys', icon: KeyIcon },
-      { label: 'Webhooks', href: '/admin/security/webhooks', icon: Webhook },
-      { label: 'IP Allowlist', href: '/admin/security/ip-allowlist', icon: WifiOff },
-      { label: 'Rate Limits', href: '/admin/security/rate-limits', icon: Gauge },
     ],
   },
   {

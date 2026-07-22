@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@schoolos/database';
 import { getDevSession } from '@/lib/dev-session';
 import { canChat } from '@/lib/communication-matrix';
+import { resolveDevUser } from '@/lib/chat-utils';
 
 export async function GET() {
   if (process.env.NODE_ENV !== 'development') {
@@ -10,12 +11,15 @@ export async function GET() {
   const session = await getDevSession();
   if (!session) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
+  const user = await resolveDevUser(session);
+  if (!user) return NextResponse.json({ success: false, error: 'User not found in DB' }, { status: 404 });
+
   try {
     const users = await prisma.user.findMany({
       where: {
         deletedAt: null,
         status: 'active',
-        id: { not: session.id },
+        id: { not: user.id },
       },
       select: {
         id: true,

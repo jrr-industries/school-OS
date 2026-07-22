@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@schoolos/database';
 import { getDevSession } from '@/lib/dev-session';
+import { resolveDevUser } from '@/lib/chat-utils';
 
 export async function GET() {
   if (process.env.NODE_ENV !== 'development') {
@@ -9,10 +10,13 @@ export async function GET() {
   const session = await getDevSession();
   if (!session) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
+  const user = await resolveDevUser(session);
+  if (!user) return NextResponse.json({ success: false, error: 'User not found in DB' }, { status: 404 });
+
   try {
     const conversations = await prisma.chatConversation.findMany({
       where: {
-        participants: { some: { userId: session.id, leftAt: null } },
+        participants: { some: { userId: user.id, leftAt: null } },
         deletedAt: null,
       },
       include: {
@@ -47,6 +51,9 @@ export async function POST(request: Request) {
   const session = await getDevSession();
   if (!session) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
+  const user = await resolveDevUser(session);
+  if (!user) return NextResponse.json({ success: false, error: 'User not found in DB' }, { status: 404 });
+
   try {
     const { participantId, title } = await request.json();
     if (!participantId) {
@@ -58,7 +65,7 @@ export async function POST(request: Request) {
         isGroup: false,
         deletedAt: null,
         AND: [
-          { participants: { some: { userId: session.id, leftAt: null } } },
+          { participants: { some: { userId: user.id, leftAt: null } } },
           { participants: { some: { userId: participantId, leftAt: null } } },
         ],
       },
@@ -88,11 +95,11 @@ export async function POST(request: Request) {
 
     const conversation = await prisma.chatConversation.create({
       data: {
-        schoolId: session.schoolId || targetUser.schoolId,
+        schoolId: targetUser.schoolId,
         title: title || null,
         participants: {
           create: [
-            { userId: session.id },
+            { userId: user.id },
             { userId: participantId },
           ],
         },
