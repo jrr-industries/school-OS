@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { toast } from 'sonner';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area, LineChart, Line,
+  PieChart, Pie, Cell, AreaChart, Area,
 } from 'recharts';
 import {
-  TrendingUp, TrendingDown, Award, Users, BookOpen, AlertTriangle,
+  TrendingUp, Award, Users, BookOpen, AlertTriangle,
   BarChart3, PieChart as PieChartIcon, School, GraduationCap,
   ArrowUpRight, ArrowDownRight,
 } from 'lucide-react';
@@ -16,75 +15,9 @@ import {
   Card, CardHeader, CardTitle, CardContent, Badge, Button, cn,
 } from '@schoolos/ui';
 import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 
-
 const PIE_COLORS = ['hsl(var(--primary))', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316'];
-
-const SAMPLE_DATA = {
-  overallAverage: 78.4,
-  passPercentage: 86.2,
-  totalStudents: 1240,
-  topClass: { name: 'X-A', average: 92.1, students: 38 },
-  topStudents: [
-    { name: 'Ananya Sharma', class: 'X-A', percentage: 98.5 },
-    { name: 'Rohan Mehta', class: 'X-B', percentage: 97.2 },
-    { name: 'Priya Singh', class: 'X-A', percentage: 96.8 },
-    { name: 'Arjun Patel', class: 'X-C', percentage: 95.9 },
-    { name: 'Isha Verma', class: 'IX-A', percentage: 95.1 },
-  ],
-  subjectPerformance: [
-    { name: 'Mathematics', score: 82, total: 100, students: 1240 },
-    { name: 'Science', score: 79, total: 100, students: 1240 },
-    { name: 'English', score: 88, total: 100, students: 1240 },
-    { name: 'Social Studies', score: 76, total: 100, students: 1240 },
-    { name: 'Hindi', score: 85, total: 100, students: 1240 },
-    { name: 'Computer Science', score: 91, total: 100, students: 680 },
-  ],
-  weakSubjects: [
-    { name: 'Social Studies', score: 62, improvement: 'Needs focus on History & Geography' },
-    { name: 'Mathematics', score: 68, improvement: 'Algebra & Geometry need attention' },
-  ],
-  performanceTrend: [
-    { month: 'Jan', average: 74, passRate: 82 },
-    { month: 'Feb', average: 75, passRate: 83 },
-    { month: 'Mar', average: 73, passRate: 81 },
-    { month: 'Apr', average: 76, passRate: 84 },
-    { month: 'May', average: 78, passRate: 85 },
-    { month: 'Jun', average: 80, passRate: 87 },
-    { month: 'Jul', average: 79, passRate: 86 },
-    { month: 'Aug', average: 81, passRate: 88 },
-    { month: 'Sep', average: 78, passRate: 86 },
-    { month: 'Oct', average: 80, passRate: 87 },
-    { month: 'Nov', average: 82, passRate: 89 },
-    { month: 'Dec', average: 84, passRate: 91 },
-  ],
-  gradeDistribution: [
-    { grade: 'A+ (≥90)', count: 186 },
-    { grade: 'A (75-89)', count: 445 },
-    { grade: 'B (60-74)', count: 372 },
-    { grade: 'C (45-59)', count: 161 },
-    { grade: 'D (33-44)', count: 62 },
-    { grade: 'F (<33)', count: 14 },
-  ],
-  monthlyComparison: [
-    { month: 'Jul', thisYear: 79, lastYear: 74 },
-    { month: 'Aug', thisYear: 81, lastYear: 75 },
-    { month: 'Sep', thisYear: 78, lastYear: 76 },
-    { month: 'Oct', thisYear: 80, lastYear: 73 },
-    { month: 'Nov', thisYear: 82, lastYear: 77 },
-    { month: 'Dec', thisYear: 84, lastYear: 78 },
-  ],
-  boardExamResults: {
-    appeared: 210,
-    passed: 198,
-    passPercentage: 94.3,
-    distinction: 85,
-    firstClass: 72,
-  },
-  lastUpdated: new Date().toISOString(),
-};
 
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
@@ -151,40 +84,58 @@ function LoadingSkeleton() {
   );
 }
 
+interface PerformanceData {
+  totalStudents: number;
+  totalTeachers: number;
+  totalClasses: number;
+  subjectCount: number;
+  topClass: { name: string; students: number };
+  classList: { name: string; count: number }[];
+  subjectPerformance: {
+    id: string; name: string; code: string; type: string;
+    group: string | null; maxMarks: number; passMarks: number;
+    creditHours: number; isLanguage: boolean; isOptional: boolean;
+  }[];
+  performanceTrend: { month: string; average: number; passRate: number }[];
+  gradeDistribution: { grade: string; count: number }[];
+  topStudents: { name: string; class: string; percentage: number }[];
+  weakSubjects: { name: string; score: number; improvement: string }[];
+  boardExamResults: { appeared: number; passed: number; passPercentage: number; distinction: number; firstClass: number } | null;
+  lastUpdated: string;
+}
+
 export default function AcademicPerformancePage() {
   const { schoolId, loading: authLoading } = useSchoolAdminAuth();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!schoolId) return;
-    const unsub = SupabaseService.subscribeByField<any>('academic', schoolId, 'school_id', schoolId, (fbData) => {
-      if (fbData) {
-        setData(fbData);
-      } else {
-        setData(SAMPLE_DATA);
-        toast.info('Using sample academic data. Connect Firebase for live data.');
-      }
-      setLoading(false);
-    });
-    return () => unsub();
+    if (!schoolId) { setLoading(false); return; }
+    fetch('/api/school-admin/academic-performance')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) setData(json.data);
+        else setError(json.error || 'Failed to load');
+      })
+      .catch(() => setError('Failed to load data'))
+      .finally(() => setLoading(false));
   }, [schoolId]);
 
-  useEffect(() => {
-    if (!schoolId) return;
-    const timeout = setTimeout(() => {
-      if (loading) {
-        setData(SAMPLE_DATA);
-        setLoading(false);
-        setError(null);
-        toast.info('Using sample academic data. Connect Firebase for live data.');
-      }
-    }, 5000);
-    return () => clearTimeout(timeout);
-  }, [schoolId, loading]);
+  const overallAverage = useMemo(() => {
+    if (!data?.performanceTrend?.length) return '—';
+    const avg = data.performanceTrend.reduce((s, m) => s + m.average, 0) / data.performanceTrend.length;
+    return `${Math.round(avg)}%`;
+  }, [data]);
+
+  const passRate = useMemo(() => {
+    if (!data?.performanceTrend?.length) return '—';
+    const avg = data.performanceTrend.reduce((s, m) => s + m.passRate, 0) / data.performanceTrend.length;
+    return `${Math.round(avg)}%`;
+  }, [data]);
 
   if (authLoading || loading) return <LoadingSkeleton />;
+
   if (error) {
     return (
       <div className="space-y-6">
@@ -194,8 +145,8 @@ export default function AcademicPerformancePage() {
             <AlertTriangle className="h-12 w-12 mb-4" />
             <h3 className="text-lg font-medium">Error loading data</h3>
             <p className="text-sm">{error}</p>
-            <Button variant="outline" className="mt-4" onClick={() => { setData(SAMPLE_DATA); setError(null); toast.info('Using sample data'); }}>
-              Use Sample Data
+            <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
+              Retry
             </Button>
           </CardContent>
         </Card>
@@ -203,8 +154,17 @@ export default function AcademicPerformancePage() {
     );
   }
 
-  const stats = data || SAMPLE_DATA;
-  const weak = stats.weakSubjects || SAMPLE_DATA.weakSubjects;
+  if (!data) {
+    return <LoadingSkeleton />;
+  }
+
+  const weak = data.weakSubjects || [];
+  const topStudents = data.topStudents || [];
+  const gradeDist = data.gradeDistribution || [];
+  const trend = data.performanceTrend || [];
+  const boardExams = data.boardExamResults;
+  const subjectPerf = data.subjectPerformance || [];
+  const classList = data.classList || [];
 
   return (
     <div className="space-y-6">
@@ -214,10 +174,18 @@ export default function AcademicPerformancePage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Overall Average" value={`${stats.overallAverage}%`} icon={TrendingUp} trend={{ value: 3.2, positive: true }} color="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" />
-        <StatCard title="Pass Percentage" value={`${stats.passPercentage}%`} icon={Award} trend={{ value: 2.1, positive: true }} color="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" />
-        <StatCard title="Total Students" value={stats.totalStudents?.toLocaleString() || '0'} icon={Users} color="bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" />
-        <StatCard title="Top Class" value={`${stats.topClass?.name || 'X-A'} (${stats.topClass?.average || 92}%)`} icon={GraduationCap} color="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400" />
+        <StatCard title="Overall Average" value={overallAverage} icon={TrendingUp} color="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" />
+        <StatCard title="Pass Rate" value={passRate} icon={Award} color="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" />
+        <StatCard title="Total Students" value={data.totalStudents?.toLocaleString() || '0'} icon={Users} color="bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" />
+        <StatCard title="Top Class" value={`${data.topClass?.name || '—'} (${data.topClass?.students || 0})`} icon={GraduationCap} color="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400" />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <StatCard title="Teachers" value={String(data.totalTeachers || 0)} icon={Users} color="bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400" />
+        <StatCard title="Classes" value={String(data.totalClasses || 0)} icon={GraduationCap} color="bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400" />
+        <StatCard title="Subjects" value={String(data.subjectCount || 0)} icon={BookOpen} color="bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400" />
+        <StatCard title="Languages" value={String(subjectPerf.filter((s) => s.isLanguage).length)} icon={BookOpen} color="bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400" />
+        <StatCard title="Electives" value={String(subjectPerf.filter((s) => s.isOptional || s.type === 'elective').length)} icon={BookOpen} color="bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400" />
       </div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid gap-6 lg:grid-cols-2">
@@ -232,28 +200,32 @@ export default function AcademicPerformancePage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[280px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.performanceTrend || SAMPLE_DATA.performanceTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="avgGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="passGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} className="text-muted-foreground" />
-                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} className="text-muted-foreground" domain={[0, 100]} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Area type="monotone" dataKey="average" name="Avg Score" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#avgGradient)" />
-                  <Area type="monotone" dataKey="passRate" name="Pass Rate" stroke="#10b981" strokeWidth={2} fill="url(#passGradient)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            {trend.length === 0 ? (
+              <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">No trend data available</div>
+            ) : (
+              <div className="h-[280px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="avgGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="passGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} className="text-muted-foreground" />
+                    <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} className="text-muted-foreground" domain={[0, 100]} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area type="monotone" dataKey="average" name="Avg Score" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#avgGradient)" />
+                    <Area type="monotone" dataKey="passRate" name="Pass Rate" stroke="#10b981" strokeWidth={2} fill="url(#passGradient)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -268,27 +240,33 @@ export default function AcademicPerformancePage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[280px] w-full flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={stats.gradeDistribution || SAMPLE_DATA.gradeDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} dataKey="count" nameKey="grade">
-                    {(stats.gradeDistribution || SAMPLE_DATA.gradeDistribution).map((_: any, i: number) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-2 flex flex-wrap justify-center gap-3">
-              {(stats.gradeDistribution || SAMPLE_DATA.gradeDistribution).map((entry: any, i: number) => (
-                <div key={entry.grade} className="flex items-center gap-1.5 text-xs">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                  <span className="text-muted-foreground">{entry.grade}</span>
-                  <span className="font-medium">{entry.count}</span>
+            {gradeDist.length === 0 || gradeDist.every((g) => g.count === 0) ? (
+              <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">No grade data available</div>
+            ) : (
+              <>
+                <div className="h-[280px] w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={gradeDist} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} dataKey="count" nameKey="grade">
+                        {gradeDist.map((_: any, i: number) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+                <div className="mt-2 flex flex-wrap justify-center gap-3">
+                  {gradeDist.map((entry: any, i: number) => (
+                    <div key={entry.grade} className="flex items-center gap-1.5 text-xs">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      <span className="text-muted-foreground">{entry.grade}</span>
+                      <span className="font-medium">{entry.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -302,17 +280,38 @@ export default function AcademicPerformancePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.subjectPerformance || SAMPLE_DATA.subjectPerformance} margin={{ top: 5, right: 10, left: -20, bottom: 0 }} barCategoryGap="25%">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} className="text-muted-foreground" />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} className="text-muted-foreground" tickFormatter={(v) => `${v}%`} />
-                  <Tooltip content={<CustomTooltip />} formatter={(value: any) => [`${value}%`, 'Score']} />
-                  <Bar dataKey="score" name="Score" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {subjectPerf.length === 0 ? (
+              <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">No subject data available</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs font-medium text-muted-foreground">
+                      <th className="pb-3 pr-4">Subject</th>
+                      <th className="pb-3 pr-4">Code</th>
+                      <th className="pb-3 pr-4">Type</th>
+                      <th className="pb-3 pr-4">Category</th>
+                      <th className="pb-3 pr-4 text-center">Max</th>
+                      <th className="pb-3 pr-4 text-center">Pass</th>
+                      <th className="pb-3 pr-4 text-center">Credits</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subjectPerf.map((s) => (
+                      <tr key={s.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                        <td className="py-2.5 pr-4 font-medium">{s.name}</td>
+                        <td className="py-2.5 pr-4 text-muted-foreground"><code className="rounded bg-muted px-1.5 py-0.5 text-xs">{s.code}</code></td>
+                        <td className="py-2.5 pr-4"><Badge variant="outline" className="text-[10px] capitalize">{s.type}</Badge></td>
+                        <td className="py-2.5 pr-4 text-muted-foreground">{s.group || '—'}</td>
+                        <td className="py-2.5 pr-4 text-center">{s.maxMarks}</td>
+                        <td className="py-2.5 pr-4 text-center">{s.passMarks}</td>
+                        <td className="py-2.5 pr-4 text-center">{s.creditHours}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -332,12 +331,12 @@ export default function AcademicPerformancePage() {
                   {weak.map((subj: any, i: number) => (
                     <div key={i} className="flex items-start gap-3 rounded-lg border p-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                        <TrendingDown className="h-4 w-4" />
+                        <TrendingUp className="h-4 w-4 rotate-180" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-medium">{subj.name}</p>
-                          <Badge variant="destructive" size="sm">{subj.score}%</Badge>
+                          <Badge variant="destructive">{subj.score}%</Badge>
                         </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">{subj.improvement}</p>
                       </div>
@@ -363,9 +362,9 @@ export default function AcademicPerformancePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {(stats.topStudents || SAMPLE_DATA.topStudents).length > 0 ? (
+              {topStudents.length > 0 ? (
                 <div className="space-y-2">
-                  {(stats.topStudents || SAMPLE_DATA.topStudents).map((student: any, i: number) => (
+                  {topStudents.map((student: any, i: number) => (
                     <div key={i} className="flex items-center gap-3 rounded-lg border p-2.5">
                       <div className={cn(
                         'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white',
@@ -397,22 +396,25 @@ export default function AcademicPerformancePage() {
           <CardHeader>
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              Monthly Comparison (This Year vs Last Year)
+              Class Distribution
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[280px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stats.monthlyComparison || SAMPLE_DATA.monthlyComparison} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} className="text-muted-foreground" />
-                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} className="text-muted-foreground" domain={[60, 100]} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="thisYear" name="This Year" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                  <Line type="monotone" dataKey="lastYear" name="Last Year" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {classList.length === 0 ? (
+              <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">No class data available</div>
+            ) : (
+              <div className="h-[280px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={classList} margin={{ top: 5, right: 10, left: -20, bottom: 0 }} barCategoryGap="25%">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} className="text-muted-foreground" />
+                    <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} className="text-muted-foreground" />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="count" name="Students" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -424,30 +426,30 @@ export default function AcademicPerformancePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {(stats.boardExamResults || SAMPLE_DATA.boardExamResults) ? (
+            {boardExams ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="rounded-lg border p-3 text-center">
                     <p className="text-xs text-muted-foreground">Appeared</p>
-                    <p className="text-xl font-bold">{(stats.boardExamResults || SAMPLE_DATA.boardExamResults).appeared}</p>
+                    <p className="text-xl font-bold">{boardExams.appeared}</p>
                   </div>
                   <div className="rounded-lg border p-3 text-center">
                     <p className="text-xs text-muted-foreground">Passed</p>
-                    <p className="text-xl font-bold text-emerald-600">{(stats.boardExamResults || SAMPLE_DATA.boardExamResults).passed}</p>
+                    <p className="text-xl font-bold text-emerald-600">{boardExams.passed}</p>
                   </div>
                   <div className="rounded-lg border p-3 text-center">
                     <p className="text-xs text-muted-foreground">Pass %</p>
-                    <p className="text-xl font-bold">{(stats.boardExamResults || SAMPLE_DATA.boardExamResults).passPercentage}%</p>
+                    <p className="text-xl font-bold">{boardExams.passPercentage}%</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1 rounded-lg border p-3">
                     <p className="text-xs text-muted-foreground">Distinction</p>
-                    <p className="text-lg font-bold text-amber-600">{(stats.boardExamResults || SAMPLE_DATA.boardExamResults).distinction}</p>
+                    <p className="text-lg font-bold text-amber-600">{boardExams.distinction}</p>
                   </div>
                   <div className="flex-1 rounded-lg border p-3">
                     <p className="text-xs text-muted-foreground">First Class</p>
-                    <p className="text-lg font-bold text-blue-600">{(stats.boardExamResults || SAMPLE_DATA.boardExamResults).firstClass}</p>
+                    <p className="text-lg font-bold text-blue-600">{boardExams.firstClass}</p>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Save, Upload, Building2, MapPin,
   Sun, Moon, Monitor, Bell, Shield, Palette, Globe2
@@ -8,7 +8,6 @@ import {
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@schoolos/ui';
 import { toast } from 'sonner';
 import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import type { SchoolSettings } from '@/features/school-admin/types';
 
 export default function SettingsPage() {
@@ -17,27 +16,41 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/school-admin/settings');
+      const json = await res.json();
+      if (json.success) {
+        setSettings(json.data);
+      } else {
+        toast.error(json.error || 'Failed to load settings');
+      }
+    } catch {
+      toast.error('Failed to load settings');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!schoolId) return;
-    const unsub = SupabaseService.subscribeByField<SchoolSettings>(
-      'settings', schoolId, 'school_id', schoolId, (data) => {
-        if (data) setSettings(data);
-        setLoading(false);
-      },
-    );
-    return () => unsub();
-  }, [schoolId]);
+    fetchSettings();
+  }, [fetchSettings]);
 
   const handleSave = async () => {
     if (!schoolId || !settings) return;
     setSaving(true);
     try {
-      await SupabaseService.update('settings', schoolId, {
-        ...settings,
-        updatedAt: new Date().toISOString(),
-        updatedBy: schoolId,
+      const res = await fetch('/api/school-admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
       });
-      toast.success('Settings saved successfully');
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Settings saved successfully');
+      } else {
+        toast.error(json.error || 'Failed to save settings');
+      }
     } catch {
       toast.error('Failed to save settings');
     } finally {

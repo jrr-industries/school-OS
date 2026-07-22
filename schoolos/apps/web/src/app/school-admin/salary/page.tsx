@@ -2,557 +2,552 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import {
-  Users, Briefcase, AlertCircle, Clock,
-  TrendingDown, BadgePercent, Banknote,
-  Calculator, Building2, DollarSign,
+  Users, Briefcase, Clock, BadgePercent,
+  Calculator, Building2, DollarSign, Banknote, UserCheck,
+  UserX, Download, Plus, Search,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, Badge } from '@schoolos/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Input, Modal, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, cn } from '@schoolos/ui';
 import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
-import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
+interface Employee {
+  id: string;
+  employeeCode: string;
+  name: string;
+  email: string;
+  avatar: string;
+  designation: string;
+  department: string;
+  joiningDate: string;
+  status: string;
+}
+
+interface AttendanceLog {
+  employeeCode: string;
+  employeeName: string;
+  date: string;
+  checkIn: string;
+  checkOut: string;
+  workingHours: string;
+  status: string;
+}
+
 interface PayrollRecord {
+  employeeCode: string;
+  employeeName: string;
+  basicSalary: number;
+  present: number;
+  late: number;
+  halfDay: number;
+  absent: number;
+  paidLeave: number;
+  unpaidLeave: number;
+  overtime: number;
+  allowances: number;
+  deductions: number;
+  grossSalary: number;
+  netSalary: number;
   month: string;
   year: number;
-  teacherSalaries: number;
-  staffSalaries: number;
-  totalAmount: number;
-  bonuses: number;
-  deductions: number;
-  pfAmount: number;
-  esiAmount: number;
-  status: 'paid' | 'pending' | 'processing';
-  paidDate: string | null;
+  processed: boolean;
 }
 
-interface SalaryAnalytics {
-  totalTeacherSalaries: number;
-  totalStaffSalaries: number;
-  pendingSalaryAmount: number;
-  payrollStatus: 'all_paid' | 'some_pending' | 'none_paid';
-  totalBonuses: number;
-  totalDeductions: number;
-  totalPF: number;
-  totalESI: number;
-  monthlyPayrollCost: number;
-  annualPayrollCost: number;
-  history: PayrollRecord[];
+interface EmployeeSalary {
+  employeeCode: string;
+  employeeName: string;
+  designation: string;
+  department: string;
+  basicSalary: number;
+  hra: number;
+  da: number;
+  transport: number;
+  pf: number;
+  esi: number;
+  bankAccount: string;
+  ifsc: string;
 }
-
-const sampleSalaryData: SalaryAnalytics = {
-  totalTeacherSalaries: 5840000,
-  totalStaffSalaries: 2160000,
-  pendingSalaryAmount: 480000,
-  payrollStatus: 'some_pending',
-  totalBonuses: 350000,
-  totalDeductions: 280000,
-  totalPF: 720000,
-  totalESI: 240000,
-  monthlyPayrollCost: 685000,
-  annualPayrollCost: 8220000,
-  history: [
-    { month: 'January', year: 2026, teacherSalaries: 487000, staffSalaries: 180000, totalAmount: 667000, bonuses: 0, deductions: 22000, pfAmount: 58000, esiAmount: 19000, status: 'paid', paidDate: '2026-02-01' },
-    { month: 'February', year: 2026, teacherSalaries: 487000, staffSalaries: 180000, totalAmount: 667000, bonuses: 25000, deductions: 24000, pfAmount: 60000, esiAmount: 20000, status: 'paid', paidDate: '2026-03-01' },
-    { month: 'March', year: 2026, teacherSalaries: 487000, staffSalaries: 180000, totalAmount: 667000, bonuses: 50000, deductions: 22000, pfAmount: 58000, esiAmount: 19000, status: 'paid', paidDate: '2026-04-01' },
-    { month: 'April', year: 2026, teacherSalaries: 487000, staffSalaries: 180000, totalAmount: 667000, bonuses: 0, deductions: 23000, pfAmount: 60000, esiAmount: 20000, status: 'paid', paidDate: '2026-05-01' },
-    { month: 'May', year: 2026, teacherSalaries: 487000, staffSalaries: 180000, totalAmount: 667000, bonuses: 0, deductions: 22000, pfAmount: 58000, esiAmount: 19000, status: 'paid', paidDate: '2026-05-31' },
-    { month: 'June', year: 2026, teacherSalaries: 487000, staffSalaries: 180000, totalAmount: 667000, bonuses: 0, deductions: 24000, pfAmount: 62000, esiAmount: 21000, status: 'paid', paidDate: '2026-07-01' },
-    { month: 'July', year: 2026, teacherSalaries: 487000, staffSalaries: 180000, totalAmount: 667000, bonuses: 35000, deductions: 23000, pfAmount: 60000, esiAmount: 20000, status: 'processing', paidDate: null },
-    { month: 'August', year: 2026, teacherSalaries: 487000, staffSalaries: 180000, totalAmount: 667000, bonuses: 0, deductions: 22000, pfAmount: 58000, esiAmount: 19000, status: 'pending', paidDate: null },
-  ],
-};
 
 function formatINR(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
+    style: 'currency', currency: 'INR', maximumFractionDigits: 0,
   }).format(amount);
 }
 
-function StatCardSkeleton() {
-  return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="space-y-3 flex-1">
-            <div className="h-4 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-            <div className="h-8 w-28 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-            <div className="h-3 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-          </div>
-          <div className="h-12 w-12 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-700" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-const statusConfig = {
-  paid: { label: 'Paid', variant: 'success' as const },
-  pending: { label: 'Pending', variant: 'warning' as const },
-  processing: { label: 'Processing', variant: 'info' as const },
-};
-
-export default function SalaryDashboardPage() {
+export default function PayrollPage() {
   const { schoolId, loading: authLoading } = useSchoolAdminAuth();
-  const [data, setData] = useState<SalaryAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error] = useState<string | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
+  const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
+  const [employeeSalaries, setEmployeeSalaries] = useState<EmployeeSalary[]>([]);
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'overview' | 'employees' | 'attendance' | 'payroll'>('overview');
+  const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
+  const [showSalaryModal, setShowSalaryModal] = useState(false);
+  const [showPayslip, setShowPayslip] = useState<PayrollRecord | null>(null);
 
-  useEffect(() => {
-    if (!schoolId) {
-      if (!authLoading) {
-        setData(sampleSalaryData);
-        setLoading(false);
+  const fetchData = async () => {
+    try {
+      const res = await fetch('/api/school-admin/salary');
+      const json = await res.json();
+      if (json.success) {
+        setEmployees(json.data.employees || []);
+        setAttendanceLogs(json.data.attendanceLogs || []);
+        setPayrollRecords(json.data.payrollRecords || []);
+        setEmployeeSalaries(json.data.employeeSalaries || []);
       }
-      return;
+    } catch {
+      toast.error('Failed to load payroll data');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const unsub = SupabaseService.subscribeByField<SalaryAnalytics>(
-      'salary_analytics', schoolId, 'school_id', schoolId,
-      (fetched) => {
-        if (fetched) {
-          setData(fetched);
-          setLoading(false);
-        }
-      },
-    );
+  useEffect(() => { if (!authLoading && schoolId) fetchData(); }, [authLoading, schoolId]);
 
-    const timeout = setTimeout(() => {
-      if (loading) {
-        setData(sampleSalaryData);
-        setLoading(false);
-        toast.info('Using sample data — realtime feed unavailable');
-      }
-    }, 5000);
+  const totalBasic = useMemo(() => employeeSalaries.reduce((s, e) => s + e.basicSalary, 0), [employeeSalaries]);
+  const processedCount = useMemo(() => payrollRecords.filter((r) => r.processed).length, [payrollRecords]);
+  const presentToday = useMemo(() => attendanceLogs.filter((a) => {
+    const d = new Date(a.date); return d.toDateString() === new Date().toDateString() && (a.status === 'present' || a.status === 'late');
+  }).length, [attendanceLogs]);
+  const lateToday = useMemo(() => attendanceLogs.filter((a) => a.status === 'late').length, [attendanceLogs]);
 
-    return () => {
-      unsub();
-      clearTimeout(timeout);
+  const filteredEmps = employees.filter((e) =>
+    e.name.toLowerCase().includes(search.toLowerCase()) || e.employeeCode.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+  const currentYear = new Date().getFullYear();
+
+  const processPayroll = async (emp: Employee) => {
+    const salary = employeeSalaries.find((s) => s.employeeCode === emp.employeeCode);
+    if (!salary) { toast.error('Set salary details first'); return; }
+
+    const monthAttendance = attendanceLogs.filter((a) => {
+      const d = new Date(a.date);
+      return a.employeeCode === emp.employeeCode && d.getMonth() === new Date().getMonth() && d.getFullYear() === currentYear;
+    });
+
+    const present = monthAttendance.filter((a) => a.status === 'present').length;
+    const late = monthAttendance.filter((a) => a.status === 'late').length;
+    const absent = monthAttendance.filter((a) => a.status === 'absent').length;
+    const halfDay = monthAttendance.filter((a) => a.status === 'half_day').length;
+    const overtime = monthAttendance.reduce((s, a) => {
+      if (!a.checkIn || !a.checkOut) return s;
+      const [inH, inM] = a.checkIn.split(':').map(Number);
+      const [outH, outM] = a.checkOut.split(':').map(Number);
+      const hrs = (outH * 60 + outM - inH * 60 - inM) / 60 - 8;
+      return s + Math.max(0, Math.round(hrs));
+    }, 0);
+
+    const perDay = salary.basicSalary / 26;
+    const grossSalary = salary.basicSalary + salary.hra + salary.da + salary.transport;
+    const deductionAmount = (absent + halfDay * 0.5) * perDay;
+    const netSalary = grossSalary - deductionAmount - salary.pf - salary.esi;
+
+    const record: PayrollRecord = {
+      employeeCode: emp.employeeCode,
+      employeeName: emp.name,
+      basicSalary: salary.basicSalary,
+      present, late, halfDay, absent,
+      paidLeave: 0, unpaidLeave: 0,
+      overtime,
+      allowances: salary.hra + salary.da + salary.transport,
+      deductions: deductionAmount + salary.pf + salary.esi,
+      grossSalary,
+      netSalary: Math.max(0, netSalary),
+      month: currentMonth,
+      year: currentYear,
+      processed: true,
     };
-  }, [schoolId, authLoading]);
 
-  const payrollStatusBadge = useMemo(() => {
-    if (!data) return null;
-    switch (data.payrollStatus) {
-      case 'all_paid': return <Badge variant="success">All Paid</Badge>;
-      case 'some_pending': return <Badge variant="warning">Some Pending</Badge>;
-      case 'none_paid': return <Badge variant="destructive">None Paid</Badge>;
-      default: return null;
+    try {
+      const res = await fetch('/api/school-admin/salary', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payrollRecord: record }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`Payroll processed for ${emp.name}`);
+        fetchData();
+      } else toast.error(json.error || 'Failed');
+    } catch {
+      toast.error('Failed to process payroll');
     }
-  }, [data]);
+  };
 
-  if (error) {
+  const saveSalary = async (salary: EmployeeSalary) => {
+    try {
+      const res = await fetch('/api/school-admin/salary', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeSalary: salary }),
+      });
+      const json = await res.json();
+      if (json.success) { toast.success('Salary details saved'); fetchData(); setShowSalaryModal(false); }
+      else toast.error(json.error || 'Failed');
+    } catch { toast.error('Failed to save'); }
+  };
+
+  if (authLoading || loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
-        <AlertCircle className="h-12 w-12 text-red-500" />
-        <p className="text-lg font-medium">Failed to load salary dashboard</p>
-        <p className="text-sm">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          Retry
-        </button>
+      <div className="space-y-6 p-6">
+        <div className="h-8 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
+          ))}
+        </div>
       </div>
     );
   }
 
-  const isLoading = authLoading || (loading && !data);
+  const tabs = [
+    { id: 'overview' as const, label: 'Overview', icon: DollarSign },
+    { id: 'employees' as const, label: 'Employees', icon: Users },
+    { id: 'attendance' as const, label: 'Attendance', icon: Clock },
+    { id: 'payroll' as const, label: 'Payroll', icon: Calculator },
+  ];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="space-y-6"
-    >
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Salary & Payroll Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Complete payroll overview and salary management
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Salary & Payroll</h1>
+          <p className="text-sm text-muted-foreground">Biometric attendance integration & automated payroll</p>
         </div>
-        {data && payrollStatusBadge}
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="gap-1.5"><Clock className="h-3 w-3" /> {currentMonth} {currentYear}</Badge>
+        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isLoading ? (
-          <>
-            <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
-          </>
-        ) : (
-          <>
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-              <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Teacher Salaries</p>
-                      <p className="text-3xl font-bold tracking-tight">{formatINR(data!.totalTeacherSalaries)}</p>
-                      <div className="flex items-center gap-1 text-xs font-medium text-emerald-600">
-                        <Briefcase className="h-3 w-3" />
-                        <span>Annual total</span>
-                      </div>
-                    </div>
-                    <div className="rounded-xl bg-blue-100 p-3 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                      <Briefcase className="h-6 w-6" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-              <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Staff Salaries</p>
-                      <p className="text-3xl font-bold tracking-tight">{formatINR(data!.totalStaffSalaries)}</p>
-                      <div className="flex items-center gap-1 text-xs font-medium text-emerald-600">
-                        <Users className="h-3 w-3" />
-                        <span>Annual total</span>
-                      </div>
-                    </div>
-                    <div className="rounded-xl bg-purple-100 p-3 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
-                      <Users className="h-6 w-6" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-              <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Pending Salary</p>
-                      <p className="text-3xl font-bold tracking-tight text-amber-600">{formatINR(data!.pendingSalaryAmount)}</p>
-                      <div className="flex items-center gap-1 text-xs font-medium text-red-600">
-                        <Clock className="h-3 w-3" />
-                        <span>{data!.history.filter(h => h.status === 'pending').length} months pending</span>
-                      </div>
-                    </div>
-                    <div className="rounded-xl bg-amber-100 p-3 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
-                      <Clock className="h-6 w-6" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Monthly Payroll Cost</p>
-                      <p className="text-3xl font-bold tracking-tight">{formatINR(data!.monthlyPayrollCost)}</p>
-                      <div className="flex items-center gap-1 text-xs font-medium text-emerald-600">
-                        <Calculator className="h-3 w-3" />
-                        <span>Current month</span>
-                      </div>
-                    </div>
-                    <div className="rounded-xl bg-emerald-100 p-3 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
-                      <Calculator className="h-6 w-6" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </>
-        )}
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isLoading ? (
-          <>
-            <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
-          </>
-        ) : (
-          <>
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Bonuses</p>
-                      <p className="text-2xl font-bold tracking-tight">{formatINR(data!.totalBonuses)}</p>
-                    </div>
-                    <div className="rounded-xl bg-green-100 p-3 text-green-600 dark:bg-green-900/30 dark:text-green-400">
-                      <BadgePercent className="h-5 w-5" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Deductions</p>
-                      <p className="text-2xl font-bold tracking-tight text-red-600">{formatINR(data!.totalDeductions)}</p>
-                    </div>
-                    <div className="rounded-xl bg-red-100 p-3 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                      <TrendingDown className="h-5 w-5" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">PF (Provident Fund)</p>
-                      <p className="text-2xl font-bold tracking-tight">{formatINR(data!.totalPF)}</p>
-                    </div>
-                    <div className="rounded-xl bg-indigo-100 p-3 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
-                      <Building2 className="h-5 w-5" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">ESI Amount</p>
-                      <p className="text-2xl font-bold tracking-tight">{formatINR(data!.totalESI)}</p>
-                    </div>
-                    <div className="rounded-xl bg-cyan-100 p-3 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400">
-                      <HeartPulseIcon className="h-5 w-5" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </>
-        )}
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                Payroll Breakdown
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-3">
-                  <div className="h-16 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
-                  <div className="h-16 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
-                  <div className="h-16 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50">
-                    <div>
-                      <p className="text-sm font-medium">Annual Payroll Cost</p>
-                      <p className="text-xs text-muted-foreground">Total salary outlay for the year</p>
-                    </div>
-                    <span className="text-xl font-bold">{formatINR(data!.annualPayrollCost)}</span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50">
-                    <div>
-                      <p className="text-sm font-medium">Teacher : Staff Ratio</p>
-                      <p className="text-xs text-muted-foreground">Salary distribution</p>
-                    </div>
-                    <span className="text-lg font-semibold">
-                      {Math.round((data!.totalTeacherSalaries / (data!.totalTeacherSalaries + data!.totalStaffSalaries)) * 100)}% : {Math.round((data!.totalStaffSalaries / (data!.totalTeacherSalaries + data!.totalStaffSalaries)) * 100)}%
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/50">
-                    <div>
-                      <p className="text-sm font-medium">PF + ESI Contribution</p>
-                      <p className="text-xs text-muted-foreground">Statutory contributions</p>
-                    </div>
-                    <span className="text-lg font-semibold">{formatINR(data!.totalPF + data!.totalESI)}</span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/30 dark:bg-emerald-950/20">
-                    <div>
-                      <p className="text-sm font-medium">Net Payroll (after deductions)</p>
-                      <p className="text-xs text-muted-foreground">Annual payroll minus deductions</p>
-                    </div>
-                    <span className="text-lg font-bold">{formatINR(data!.annualPayrollCost - data!.totalDeductions)}</span>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                <Banknote className="h-4 w-4 text-muted-foreground" />
-                Contributions Overview
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-3">
-                  <div className="h-16 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
-                  <div className="h-16 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="rounded-lg border p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
-                          <Building2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">Provident Fund (PF)</p>
-                          <p className="text-xs text-muted-foreground">12% employer + 12% employee</p>
-                        </div>
-                      </div>
-                      <span className="text-lg font-bold">{formatINR(data!.totalPF)}</span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(data!.totalPF / (data!.totalPF + data!.totalESI)) * 100}%` }}
-                        transition={{ duration: 1 }}
-                        className="h-full rounded-full bg-indigo-500"
-                      />
-                    </div>
-                  </div>
-                  <div className="rounded-lg border p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="rounded-lg bg-cyan-100 p-2 dark:bg-cyan-900/30">
-                          <HeartPulseIcon className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">ESI</p>
-                          <p className="text-xs text-muted-foreground">3.25% employer + 0.75% employee</p>
-                        </div>
-                      </div>
-                      <span className="text-lg font-bold">{formatINR(data!.totalESI)}</span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(data!.totalESI / (data!.totalPF + data!.totalESI)) * 100}%` }}
-                        transition={{ duration: 1 }}
-                        className="h-full rounded-full bg-cyan-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Banknote className="h-4 w-4 text-muted-foreground" />
-              Payroll History
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-12 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-                ))}
+      <Card className="overflow-hidden">
+        <div className="flex border-b overflow-x-auto">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'flex items-center gap-2 px-5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                  isActive ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        <CardContent className="p-6">
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="rounded-lg bg-blue-100 p-2.5 text-blue-600 dark:bg-blue-900/30"><Briefcase className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">Total Employees</p><p className="text-xl font-bold">{employees.length}</p></div></div></CardContent></Card>
+                <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="rounded-lg bg-emerald-100 p-2.5 text-emerald-600 dark:bg-emerald-900/30"><UserCheck className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">Present Today</p><p className="text-xl font-bold text-emerald-600">{presentToday}</p></div></div></CardContent></Card>
+                <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="rounded-lg bg-amber-100 p-2.5 text-amber-600 dark:bg-amber-900/30"><Clock className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">Late Today</p><p className="text-xl font-bold text-amber-600">{lateToday}</p></div></div></CardContent></Card>
+                <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="rounded-lg bg-red-100 p-2.5 text-red-600 dark:bg-red-900/30"><UserX className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">Absent Today</p><p className="text-xl font-bold text-red-600">{employees.length - presentToday - lateToday}</p></div></div></CardContent></Card>
               </div>
-            ) : data!.history.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <Banknote className="h-8 w-8 mb-2" />
-                <p className="text-sm">No payroll history available</p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="rounded-lg bg-purple-100 p-2.5 text-purple-600"><Calculator className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">Total Basic Salary</p><p className="text-xl font-bold">{formatINR(totalBasic)}</p></div></div></CardContent></Card>
+                <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="rounded-lg bg-green-100 p-2.5 text-green-600"><BadgePercent className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">Payroll Processed</p><p className="text-xl font-bold">{processedCount}/{employees.length}</p></div></div></CardContent></Card>
+                <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="rounded-lg bg-indigo-100 p-2.5 text-indigo-600"><Building2 className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">Avg Salary/Employee</p><p className="text-xl font-bold">{employees.length > 0 ? formatINR(Math.round(totalBasic / employees.length)) : '₹0'}</p></div></div></CardContent></Card>
+                <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="rounded-lg bg-cyan-100 p-2.5 text-cyan-600"><Banknote className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">Monthly Payroll</p><p className="text-xl font-bold">{formatINR(totalBasic)}</p></div></div></CardContent></Card>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
+              <Card>
+                <CardHeader><CardTitle className="text-sm font-medium">Biometric Attendance Integration</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="rounded-lg border-2 border-dashed p-8 text-center text-muted-foreground">
+                    <div className="flex justify-center mb-3"><div className="rounded-lg bg-muted p-3"><Clock className="h-8 w-8" /></div></div>
+                    <h3 className="font-medium mb-1">Connect Biometric Device</h3>
+                    <p className="text-sm mb-4">Sync attendance logs from fingerprint, face recognition, or RFID devices automatically.</p>
+                    <div className="grid gap-3 sm:grid-cols-3 max-w-lg mx-auto text-left text-sm">
+                      <div className="rounded-lg border p-3"><p className="font-medium text-xs text-muted-foreground">Step 1</p><p>Connect device via API</p></div>
+                      <div className="rounded-lg border p-3"><p className="font-medium text-xs text-muted-foreground">Step 2</p><p>Auto-sync punch logs</p></div>
+                      <div className="rounded-lg border p-3"><p className="font-medium text-xs text-muted-foreground">Step 3</p><p>Payroll auto-calculated</p></div>
+                    </div>
+                    <Button variant="outline" className="mt-4 gap-2" onClick={() => toast.info('Biometric integration coming soon')}>
+                      <Plus className="h-4 w-4" /> Configure Device
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {activeTab === 'employees' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input placeholder="Search employees..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                </div>
+                <Button size="sm" className="gap-2" onClick={() => setShowSalaryModal(true)}>
+                  <Plus className="h-4 w-4" /> Set Salary
+                </Button>
+              </div>
+              <div className="overflow-x-auto rounded-lg border">
                 <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-xs font-medium text-muted-foreground">
-                      <th className="pb-3 pr-4 font-medium">Month</th>
-                      <th className="pb-3 pr-4 font-medium">Teacher Salary</th>
-                      <th className="pb-3 pr-4 font-medium">Staff Salary</th>
-                      <th className="pb-3 pr-4 font-medium">Bonuses</th>
-                      <th className="pb-3 pr-4 font-medium">Deductions</th>
-                      <th className="pb-3 pr-4 font-medium">Total</th>
-                      <th className="pb-3 pr-4 font-medium">Status</th>
-                      <th className="pb-3 font-medium">Paid Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data!.history.map((record, idx) => (
-                      <motion.tr
-                        key={`${record.month}-${record.year}`}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.03 }}
-                        className="border-b last:border-0 transition-colors hover:bg-muted/30"
-                      >
-                        <td className="py-3 pr-4">
-                          <span className="font-medium">{record.month}</span>
-                          <span className="text-muted-foreground ml-1">{record.year}</span>
-                        </td>
-                        <td className="py-3 pr-4">{formatINR(record.teacherSalaries)}</td>
-                        <td className="py-3 pr-4">{formatINR(record.staffSalaries)}</td>
-                        <td className="py-3 pr-4">{record.bonuses > 0 ? formatINR(record.bonuses) : '-'}</td>
-                        <td className="py-3 pr-4">{formatINR(record.deductions)}</td>
-                        <td className="py-3 pr-4 font-semibold">{formatINR(record.totalAmount)}</td>
-                        <td className="py-3 pr-4">
-                          <Badge variant={statusConfig[record.status].variant} size="sm">
-                            {statusConfig[record.status].label}
-                          </Badge>
-                        </td>
-                        <td className="py-3 text-muted-foreground">
-                          {record.paidDate ? new Date(record.paidDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                        </td>
-                      </motion.tr>
+                  <thead><tr className="border-b bg-muted/50 text-left text-xs font-medium text-muted-foreground">
+                    <th className="px-4 py-3">Employee</th>
+                    <th className="px-4 py-3">Code</th>
+                    <th className="px-4 py-3">Designation</th>
+                    <th className="px-4 py-3">Department</th>
+                    <th className="px-4 py-3 text-right">Basic Salary</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr></thead>
+                  <tbody className="divide-y">
+                    {filteredEmps.length === 0 ? (
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No employees found</td></tr>
+                    ) : filteredEmps.map((emp) => {
+                      const salary = employeeSalaries.find((s) => s.employeeCode === emp.employeeCode);
+                      return (
+                        <tr key={emp.id} className="group hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">{emp.name.charAt(0)}</div>
+                              <div><p className="font-medium">{emp.name}</p><p className="text-xs text-muted-foreground">{emp.email}</p></div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3"><code className="rounded bg-muted px-1.5 py-0.5 text-xs">{emp.employeeCode}</code></td>
+                          <td className="px-4 py-3">{emp.designation}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{emp.department}</td>
+                          <td className="px-4 py-3 text-right font-medium">{salary ? formatINR(salary.basicSalary) : '—'}</td>
+                          <td className="px-4 py-3 text-center"><Badge variant={emp.status === 'active' ? 'success' : 'secondary'} className="text-[10px]">{emp.status}</Badge></td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => {
+                                setSelectedEmp(emp);
+                                setShowSalaryModal(true);
+                              }}>Salary</Button>
+                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={async () => {
+                                const rec = payrollRecords.find((r) => r.employeeCode === emp.employeeCode && r.month === currentMonth && r.year === currentYear);
+                                if (rec) setShowPayslip(rec);
+                                else { await processPayroll(emp); }
+                              }}>Process</Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'attendance' && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Biometric attendance logs — auto-synced from device. Click status to toggle.</p>
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b bg-muted/50 text-left text-xs font-medium text-muted-foreground">
+                    <th className="px-4 py-3">Employee</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Check In</th>
+                    <th className="px-4 py-3">Check Out</th>
+                    <th className="px-4 py-3">Working Hours</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr></thead>
+                  <tbody className="divide-y">
+                    {attendanceLogs.length === 0 ? (
+                      <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center"><Clock className="h-8 w-8 mb-2" /><p>No attendance records yet</p><p className="text-xs mt-1">Biometric sync will populate this automatically</p></div>
+                      </td></tr>
+                    ) : attendanceLogs.slice(0, 50).map((log, i) => (
+                      <tr key={i} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-2.5 font-medium">{log.employeeName}</td>
+                        <td className="px-4 py-2.5 text-muted-foreground">{log.date}</td>
+                        <td className="px-4 py-2.5">{log.checkIn}</td>
+                        <td className="px-4 py-2.5">{log.checkOut}</td>
+                        <td className="px-4 py-2.5">{log.workingHours}</td>
+                        <td className="px-4 py-2.5"><Badge variant={
+                          log.status === 'present' ? 'success' : log.status === 'late' ? 'warning' : log.status === 'half_day' ? 'default' : 'destructive'
+                        } className="text-[10px] capitalize">{log.status.replace('_', ' ')}</Badge></td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
-  );
-}
+            </div>
+          )}
 
-function HeartPulseIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-      <polyline points="3.5 11.5 7.5 11.5 9.5 8.5 12.5 14.5 14.5 11.5 18.5 11.5" />
-    </svg>
+          {activeTab === 'payroll' && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Processed payroll records. Click "Generate" to calculate salary based on attendance.</p>
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b bg-muted/50 text-left text-xs font-medium text-muted-foreground">
+                    <th className="px-4 py-3">Employee</th>
+                    <th className="px-4 py-3 text-center">Present</th>
+                    <th className="px-4 py-3 text-center">Late</th>
+                    <th className="px-4 py-3 text-center">Half Day</th>
+                    <th className="px-4 py-3 text-center">Absent</th>
+                    <th className="px-4 py-3 text-center">OT</th>
+                    <th className="px-4 py-3 text-right">Gross</th>
+                    <th className="px-4 py-3 text-right">Deductions</th>
+                    <th className="px-4 py-3 text-right">Net Salary</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                  </tr></thead>
+                  <tbody className="divide-y">
+                    {payrollRecords.length === 0 ? (
+                      <tr><td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center"><Calculator className="h-8 w-8 mb-2" /><p>No payroll processed yet</p><p className="text-xs mt-1">Go to Employees tab and click "Process" to generate payroll</p></div>
+                      </td></tr>
+                    ) : payrollRecords.map((rec, i) => (
+                      <tr key={i} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setShowPayslip(rec)}>
+                        <td className="px-4 py-3 font-medium">{rec.employeeName}</td>
+                        <td className="px-4 py-3 text-center">{rec.present}</td>
+                        <td className="px-4 py-3 text-center text-amber-600">{rec.late}</td>
+                        <td className="px-4 py-3 text-center text-orange-600">{rec.halfDay}</td>
+                        <td className="px-4 py-3 text-center text-red-600">{rec.absent}</td>
+                        <td className="px-4 py-3 text-center text-emerald-600">{rec.overtime}h</td>
+                        <td className="px-4 py-3 text-right font-medium">{formatINR(rec.grossSalary)}</td>
+                        <td className="px-4 py-3 text-right text-red-600">{formatINR(rec.deductions)}</td>
+                        <td className="px-4 py-3 text-right font-bold text-emerald-600">{formatINR(rec.netSalary)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge variant={rec.processed ? 'success' : 'warning'} className="text-[10px]">{rec.processed ? 'Paid' : 'Pending'}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Modal open={showSalaryModal} onOpenChange={(o) => { if (!o) setShowSalaryModal(false); }}>
+        <div className="p-6 max-h-[80vh] overflow-y-auto">
+          <h3 className="text-lg font-semibold mb-4">Set Employee Salary</h3>
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Employee</label>
+                <Select value={selectedEmp?.id || ''} onValueChange={(v) => {
+                  const emp = employees.find((e) => e.id === v);
+                  setSelectedEmp(emp || null);
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                  <SelectContent>
+                    {employees.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>{e.name} ({e.employeeCode})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Basic Salary (₹)</label>
+                <Input type="number" id="basicSalary" defaultValue={0} />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">HRA</label>
+                <Input type="number" id="hra" defaultValue={0} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">DA</label>
+                <Input type="number" id="da" defaultValue={0} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Transport</label>
+                <Input type="number" id="transport" defaultValue={0} />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">PF Deduction</label>
+                <Input type="number" id="pf" defaultValue={0} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">ESI Deduction</label>
+                <Input type="number" id="esi" defaultValue={0} />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Bank Account</label>
+                <Input id="bankAccount" placeholder="XXXXXXXXXX" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">IFSC Code</label>
+                <Input id="ifsc" placeholder="SBIN0001234" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" onClick={() => setShowSalaryModal(false)}>Cancel</Button>
+              <Button onClick={() => {
+                if (!selectedEmp) { toast.error('Select an employee'); return; }
+                const basic = parseInt((document.getElementById('basicSalary') as HTMLInputElement).value) || 0;
+                const hra = parseInt((document.getElementById('hra') as HTMLInputElement).value) || 0;
+                const da = parseInt((document.getElementById('da') as HTMLInputElement).value) || 0;
+                const transport = parseInt((document.getElementById('transport') as HTMLInputElement).value) || 0;
+                const pf = parseInt((document.getElementById('pf') as HTMLInputElement).value) || 0;
+                const esi = parseInt((document.getElementById('esi') as HTMLInputElement).value) || 0;
+                const bankAccount = (document.getElementById('bankAccount') as HTMLInputElement).value;
+                const ifsc = (document.getElementById('ifsc') as HTMLInputElement).value;
+                saveSalary({
+                  employeeCode: selectedEmp.employeeCode,
+                  employeeName: selectedEmp.name,
+                  designation: selectedEmp.designation,
+                  department: selectedEmp.department,
+                  basicSalary: basic, hra, da, transport, pf, esi, bankAccount, ifsc,
+                });
+              }}>Save Salary</Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!showPayslip} onOpenChange={(o) => { if (!o) setShowPayslip(null); }}>
+        {showPayslip && (
+          <div className="p-6 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold">Salary Slip</h3>
+                <p className="text-sm text-muted-foreground">{showPayslip.month} {showPayslip.year}</p>
+              </div>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" /> Download PDF
+              </Button>
+            </div>
+            <div className="rounded-lg border p-4 mb-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div><p className="text-xs text-muted-foreground">Employee</p><p className="font-medium">{showPayslip.employeeName}</p></div>
+                <div><p className="text-xs text-muted-foreground">Code</p><p className="font-medium">{showPayslip.employeeCode}</p></div>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 mb-4">
+              <div className="rounded-lg border p-4">
+                <h4 className="text-sm font-semibold mb-3">Attendance Summary</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Present</span><span className="font-medium">{showPayslip.present}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Late</span><span className="font-medium text-amber-600">{showPayslip.late}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Half Day</span><span className="font-medium text-orange-600">{showPayslip.halfDay}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Absent</span><span className="font-medium text-red-600">{showPayslip.absent}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Overtime</span><span className="font-medium text-emerald-600">{showPayslip.overtime}h</span></div>
+                </div>
+              </div>
+              <div className="rounded-lg border p-4">
+                <h4 className="text-sm font-semibold mb-3">Salary Breakdown</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Basic Salary</span><span className="font-medium">{formatINR(showPayslip.basicSalary)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Allowances</span><span className="font-medium">{formatINR(showPayslip.allowances)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Gross Salary</span><span className="font-medium">{formatINR(showPayslip.grossSalary)}</span></div>
+                  <div className="border-t pt-2 flex justify-between"><span className="text-muted-foreground">Deductions</span><span className="font-medium text-red-600">-{formatINR(showPayslip.deductions)}</span></div>
+                  <div className="border-t pt-2 flex justify-between"><span className="font-semibold">Net Salary</span><span className="text-lg font-bold text-emerald-600">{formatINR(showPayslip.netSalary)}</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
   );
 }

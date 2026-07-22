@@ -143,10 +143,12 @@ function DevLoginPage() {
           </form>
         </CardContent>
         <CardFooter className="flex-col border-t px-6 py-4">
-          <div className="mb-3 grid w-full grid-cols-3 gap-2">
+          <div className="mb-3 grid w-full grid-cols-4 gap-2">
             {([
               { slug: 'super_admin', label: 'Super Admin', icon: '🛡️' },
               { slug: 'school_admin', label: 'School Admin', icon: '🏫' },
+              { slug: 'principal', label: 'Principal', icon: '👨‍🏫' },
+              { slug: 'vice_principal', label: 'Vice Principal', icon: '👩‍🏫' },
               { slug: 'teacher', label: 'Teacher', icon: '👨‍🏫' },
               { slug: 'staff', label: 'Staff', icon: '👔' },
               { slug: 'parent', label: 'Parent', icon: '👪' },

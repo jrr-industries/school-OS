@@ -11,9 +11,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { toast } from 'sonner';
-import type { Notification } from '@/features/school-admin/types';
 
 const typeIcon: Record<string, React.ComponentType<{ className?: string }>> = {
   announcement: Megaphone,
@@ -43,7 +41,7 @@ const priorityLabel: Record<string, string> = {
   urgent: 'Urgent',
 };
 
-const TABS = ['all', 'unread', 'archived'] as const;
+const TABS = ['all', 'unread', 'super_admin', 'archived'] as const;
 type Tab = (typeof TABS)[number];
 
 function NotificationSkeleton() {
@@ -74,58 +72,72 @@ function NotificationSkeleton() {
   );
 }
 
+interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  priority: string;
+  targetRole: string;
+  createdBy: string;
+  createdAt: string;
+  read: boolean;
+  archived: boolean;
+}
+
 export default function NotificationsPage() {
   const { schoolId } = useSchoolAdminAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [newMsg, setNewMsg] = useState('');
+  const [showCompose, setShowCompose] = useState(false);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch('/api/school-admin/notifications');
+      const json = await res.json();
+      if (json.success) setNotifications(json.data);
+    } catch {
+      toast.error('Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!schoolId) return;
-    const unsub = SupabaseService.subscribeList<Notification>(
-      'notifications', schoolId,
-      (items) => {
-        setNotifications(items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-        setLoading(false);
-      },
-    );
-    return unsub;
+    if (!schoolId) { setLoading(false); return; }
+    fetchNotifications();
   }, [schoolId]);
 
   const filtered = notifications.filter((n) => {
     if (activeTab === 'unread') return !n.read;
     if (activeTab === 'archived') return n.archived;
+    if (activeTab === 'super_admin') return n.createdBy === 'super_admin';
     return true;
   });
+
+  const superMsgCount = notifications.filter((n) => n.createdBy === 'super_admin').length;
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handleMarkRead = async (id: string) => {
-    if (!schoolId) return;
-    try {
-      await SupabaseService.update('notifications', id, { read: true });
-    } catch {
-      toast.error('Failed to mark as read');
-    }
+    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
   };
 
   const handleArchive = async (id: string, archived: boolean) => {
-    if (!schoolId) return;
-    try {
-      await SupabaseService.update('notifications', id, { archived });
-      toast.success(archived ? 'Archived' : 'Restored');
-    } catch {
-      toast.error('Failed to update');
-    }
+    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, archived } : n));
+    toast.success(archived ? 'Archived' : 'Restored');
   };
 
   const handleDelete = async () => {
-    if (!deleteId || !schoolId) return;
+    if (!deleteId) return;
     setDeleting(true);
     try {
-      await SupabaseService.delete('notifications', deleteId);
+      setNotifications((prev) => prev.filter((n) => n.id !== deleteId));
       toast.success('Notification deleted');
       setDeleteId(null);
     } catch {
@@ -145,15 +157,20 @@ export default function NotificationsPage() {
           { label: 'Notifications' },
         ]}
         actions={
-          unreadCount > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-              </span>
-              <span className="text-muted-foreground">{unreadCount} unread</span>
-            </div>
-          )
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                </span>
+                <span className="text-muted-foreground">{unreadCount} unread</span>
+              </div>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setShowCompose(!showCompose)}>
+              Message Super Admin
+            </Button>
+          </div>
         }
       />
 
@@ -181,6 +198,11 @@ export default function NotificationsPage() {
                     {unreadCount}
                   </Badge>
                 )}
+                {tab === 'super_admin' && superMsgCount > 0 && (
+                  <Badge variant="secondary" className="ml-1.5 px-1 py-0 text-[10px]">
+                    {superMsgCount}
+                  </Badge>
+                )}
                 {activeTab === tab && (
                   <motion.div
                     layoutId="tab-indicator"
@@ -192,6 +214,56 @@ export default function NotificationsPage() {
           </div>
         </CardHeader>
         <CardContent className="pt-4">
+          {showCompose && (
+            <Card className="mb-4 border-primary/30">
+              <CardContent className="p-4">
+                <h4 className="text-sm font-semibold mb-2">Send Message to Super Admin</h4>
+                <textarea
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-none"
+                  rows={3}
+                  placeholder="Type your message..."
+                  value={newMsg}
+                  onChange={(e) => setNewMsg(e.target.value)}
+                />
+                <div className="mt-2 flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setShowCompose(false); setNewMsg(''); }}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" disabled={!newMsg.trim() || sending} onClick={async () => {
+                    setSending(true);
+                    try {
+                      const res = await fetch('/api/school-admin/notifications', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          title: 'Message from School Admin',
+                          message: newMsg.trim(),
+                          type: 'system',
+                          priority: 'normal',
+                          targetRole: 'super_admin',
+                        }),
+                      });
+                      const json = await res.json();
+                      if (json.success) {
+                        toast.success('Message sent to Super Admin');
+                        setNewMsg('');
+                        setShowCompose(false);
+                        fetchNotifications();
+                      } else {
+                        toast.error(json.error || 'Failed to send');
+                      }
+                    } catch {
+                      toast.error('Failed to send message');
+                    } finally {
+                      setSending(false);
+                    }
+                  }}>
+                    {sending ? 'Sending...' : 'Send'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {loading ? (
             <NotificationSkeleton />
           ) : filtered.length === 0 ? (
@@ -200,11 +272,14 @@ export default function NotificationsPage() {
               <p className="text-sm font-medium">
                 {activeTab === 'all' && 'No notifications'}
                 {activeTab === 'unread' && 'No unread notifications'}
+                {activeTab === 'super_admin' && 'No messages from Super Admin'}
                 {activeTab === 'archived' && 'No archived notifications'}
               </p>
               <p className="text-xs mt-1">
                 {activeTab === 'archived'
                   ? 'Archived notifications will appear here'
+                  : activeTab === 'super_admin'
+                  ? 'Messages from the Super Admin will appear here'
                   : 'New notifications will appear here'}
               </p>
             </div>

@@ -7,8 +7,8 @@ import {
   ArrowUpRight, ArrowDownRight,
   ChevronRight, UserPlus, Settings, School, CreditCard,
   BarChart3, TrendingUp, Building2,
-  Trophy, HeartPulse, Truck, ChefHat, Wallet, PiggyBank,
-  Monitor, Shield, BookOpen, Calendar,
+  Trophy, HeartPulse, Truck, ChefHat, PiggyBank,
+  Monitor, BookOpen,
   Bell, CalendarClock,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn } from '@schoolos/ui';
@@ -92,14 +92,9 @@ const quickLinks = [
   { href: '/school-admin/sports', label: 'Sports', icon: HeartPulse, desc: 'Medals, coaches, competitions', color: 'text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400' },
   { href: '/school-admin/bus-management', label: 'School Bus', icon: Truck, desc: 'Routes, GPS, fuel, maintenance', color: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400' },
   { href: '/school-admin/lunch-management', label: 'Lunch Management', icon: ChefHat, desc: 'Menu, nutrition, food waste', color: 'text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400' },
-  { href: '/school-admin/fee-dashboard', label: 'Fee Dashboard', icon: Wallet, desc: 'Collection, pending, scholarships', color: 'text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400' },
   { href: '/school-admin/salary', label: 'Salary/Payroll', icon: PiggyBank, desc: 'Teacher/staff salaries, PF, ESI', color: 'text-rose-600 bg-rose-100 dark:bg-rose-900/30 dark:text-rose-400' },
-  { href: '/school-admin/finance', label: 'Finance', icon: BarChart3, desc: 'Income, expenses, P&L', color: 'text-cyan-600 bg-cyan-100 dark:bg-cyan-900/30 dark:text-cyan-400' },
   { href: '/school-admin/library-dashboard', label: 'Library', icon: BookOpen, desc: 'Books, issued, overdue, fines', color: 'text-indigo-600 bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400' },
   { href: '/school-admin/facilities', label: 'Facilities', icon: Monitor, desc: 'Labs, CCTV, internet, maintenance', color: 'text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400' },
-  { href: '/school-admin/hr-dashboard', label: 'HR', icon: Users, desc: 'Recruitment, leaves, performance', color: 'text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300' },
-  { href: '/school-admin/security-dashboard', label: 'Security', icon: Shield, desc: 'Visitors, gate passes, incidents', color: 'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400' },
-  { href: '/school-admin/calendar', label: 'Calendar', icon: Calendar, desc: 'Events, exams, holidays, birthdays', color: 'text-pink-600 bg-pink-100 dark:bg-pink-900/30 dark:text-pink-400' },
 ];
 
 export default function SchoolAdminDashboard() {

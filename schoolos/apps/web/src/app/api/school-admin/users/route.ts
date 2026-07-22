@@ -11,7 +11,7 @@ export async function GET() {
     }
 
     const users = await prisma.user.findMany({
-      where: { schoolId: session.schoolId, deletedAt: null },
+      where: { schoolId: session.schoolId, deletedAt: null, isSuperAdmin: false },
       include: {
         userRoles: {
           include: { role: { select: { id: true, name: true, slug: true } } },

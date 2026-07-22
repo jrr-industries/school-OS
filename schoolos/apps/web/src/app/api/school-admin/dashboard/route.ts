@@ -11,12 +11,17 @@ export async function GET() {
 
     const schoolId = session.schoolId;
 
-    const [school, userCounts] = await Promise.all([
+    const [school, userCounts, subscription] = await Promise.all([
       prisma.school.findUnique({ where: { id: schoolId } }),
       prisma.user.groupBy({
         by: ['status'],
         where: { schoolId, deletedAt: null },
         _count: { id: true },
+      }),
+      prisma.subscription.findFirst({
+        where: { schoolId, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        include: { plan: { select: { name: true } } },
       }),
     ]);
 
@@ -50,6 +55,15 @@ export async function GET() {
     const academicYear = typeof settings.academicYear === 'string' ? settings.academicYear : '2026-27';
     const principalName = typeof settings.principalName === 'string' ? settings.principalName : 'Not assigned';
 
+    const subData = subscription
+      ? {
+          plan: subscription.plan.name,
+          status: subscription.status,
+          startDate: new Date(subscription.startsAt).toISOString(),
+          endDate: subscription.endsAt ? new Date(subscription.endsAt).toISOString() : null,
+        }
+      : null;
+
     return NextResponse.json({
       success: true,
       data: {
@@ -71,6 +85,7 @@ export async function GET() {
         staffCount: totalStaff,
         activeUsers: totalActiveUsers?._count.id ?? 0,
         createdAt: school.createdAt.toISOString(),
+        subscription: subData,
       },
     });
   } catch (error) {

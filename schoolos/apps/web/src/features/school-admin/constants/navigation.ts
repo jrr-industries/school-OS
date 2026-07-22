@@ -7,7 +7,7 @@ import {
   UserCheck, UserCog, Notebook, Route,
   School, ChevronDown, Monitor, HeadphonesIcon,
   Shirt, BusFront, BedDouble, ClipboardPen,
-  UserRoundCog
+  UserRoundCog, Megaphone
 } from 'lucide-react';
 
 export const NAV_ICONS = {
@@ -19,7 +19,7 @@ export const NAV_ICONS = {
   UserCheck, UserCog, Notebook, Route,
   School, ChevronDown, Monitor, HeadphonesIcon,
   Shirt, BusFront, BedDouble, ClipboardPen,
-  UserRoundCog
+  UserRoundCog, Megaphone
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;
@@ -102,7 +102,14 @@ export const navigationConfig: NavItem[] = [
   { name: 'Transport', href: '/school-admin/transport', icon: 'Bus' },
   { name: 'Hostel', href: '/school-admin/hostel', icon: 'Building2' },
   { name: 'Inventory', href: '/school-admin/inventory', icon: 'Package' },
-  { name: 'Communication', href: '/school-admin/communication', icon: 'MessageSquare' },
+  {
+    name: 'Communication',
+    icon: 'MessageSquare',
+    children: [
+      { name: 'Announcements', href: '/school-admin/communication', icon: 'Megaphone' },
+      { name: 'Chat', href: '/school-admin/communication/chat', icon: 'MessageSquare' },
+    ],
+  },
   { name: 'Reports', href: '/school-admin/reports', icon: 'BarChart3' },
   { name: 'Analytics', href: '/school-admin/analytics', icon: 'LineChart' },
   { name: 'School Settings', href: '/school-admin/settings', icon: 'Settings' },

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CalendarDays, Plus, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, Button, Input, Badge, cn } from '@schoolos/ui';
 import { toast } from 'sonner';
 import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import { PageHeader } from '@/features/school-admin/components/page-header';
 
 interface AcademicYear {
   id: string;
@@ -13,8 +13,7 @@ interface AcademicYear {
   startDate: string;
   endDate: string;
   isCurrent: boolean;
-  status: 'active' | 'inactive';
-  createdAt: string;
+  isActive: boolean;
 }
 
 export default function AcademicYearsPage() {
@@ -24,16 +23,24 @@ export default function AcademicYearsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', startDate: '', endDate: '' });
 
-  useEffect(() => {
+  const fetchYears = useCallback(async () => {
     if (!schoolId) return;
-    const unsub = SupabaseService.subscribeList<AcademicYear>(
-      'academicYears', schoolId, (items) => {
-        setYears(items);
-        setLoading(false);
-      },
-    );
-    return () => unsub();
+    try {
+      const res = await fetch('/api/school-admin/academic-years');
+      const json = await res.json();
+      if (json.success) {
+        setYears(json.data);
+      }
+    } catch {
+      toast.error('Failed to load academic years');
+    } finally {
+      setLoading(false);
+    }
   }, [schoolId]);
+
+  useEffect(() => {
+    fetchYears();
+  }, [fetchYears]);
 
   const handleSubmit = async () => {
     if (!schoolId || !form.name.trim()) {
@@ -41,12 +48,20 @@ export default function AcademicYearsPage() {
       return;
     }
     try {
-      await SupabaseService.insert('academicYears', {
-        ...form, school_id: schoolId, isCurrent: years.length === 0, status: 'active', createdAt: new Date().toISOString(),
+      const res = await fetch('/api/school-admin/academic-years', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, schoolId }),
       });
-      toast.success('Academic year created');
-      setForm({ name: '', startDate: '', endDate: '' });
-      setShowForm(false);
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Academic year created');
+        setForm({ name: '', startDate: '', endDate: '' });
+        setShowForm(false);
+        fetchYears();
+      } else {
+        toast.error(json.error || 'Failed to create');
+      }
     } catch {
       toast.error('Failed to create academic year');
     }
@@ -54,13 +69,18 @@ export default function AcademicYearsPage() {
 
   const setCurrent = async (id: string) => {
     try {
-      for (const y of years) {
-        if (y.isCurrent) {
-          await SupabaseService.update('academicYears', y.id, { isCurrent: false });
-        }
+      const res = await fetch('/api/school-admin/academic-years', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, isCurrent: true }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Current year updated');
+        fetchYears();
+      } else {
+        toast.error(json.error || 'Failed to update');
       }
-      await SupabaseService.update('academicYears', id, { isCurrent: true });
-      toast.success('Current year updated');
     } catch {
       toast.error('Failed to update');
     }
@@ -68,15 +88,19 @@ export default function AcademicYearsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Academic Years</h1>
-          <p className="text-sm text-muted-foreground">Manage academic years and terms</p>
-        </div>
-        <Button onClick={() => setShowForm(!showForm)} className="gap-2">
-          <Plus className="h-4 w-4" /> Add Year
-        </Button>
-      </div>
+      <PageHeader
+        title="Academic Years"
+        description="Manage academic years and batch-wise student enrollment"
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/school-admin/dashboard' },
+          { label: 'Academic Years' },
+        ]}
+        actions={
+          <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+            <Plus className="h-4 w-4" /> Add Year
+          </Button>
+        }
+      />
 
       {showForm && (
         <Card className="border-primary/20">
@@ -130,8 +154,8 @@ export default function AcademicYearsPage() {
                       <h3 className="font-semibold">{year.name}</h3>
                       <div className="flex items-center gap-2 mt-1">
                         {year.isCurrent && <Badge className="text-[10px]">Current</Badge>}
-                        <Badge variant={year.status === 'active' ? 'default' : 'secondary'} className="text-[10px] capitalize">
-                          {year.status}
+                        <Badge variant={year.isActive ? 'success' : 'secondary'} className="text-[10px] capitalize">
+                          {year.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                       </div>
                     </div>
@@ -147,7 +171,7 @@ export default function AcademicYearsPage() {
                     <p className="text-xs font-medium">{year.endDate ? new Date(year.endDate).toLocaleDateString() : '-'}</p>
                   </div>
                 </div>
-                {!year.isCurrent && year.status === 'active' && (
+                {!year.isCurrent && year.isActive && (
                   <Button variant="outline" size="sm" className="w-full mt-4 gap-2" onClick={() => setCurrent(year.id)}>
                     <CheckCircle2 className="h-4 w-4" /> Set as Current
                   </Button>

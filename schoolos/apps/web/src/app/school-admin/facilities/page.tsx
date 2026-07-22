@@ -1,14 +1,12 @@
-'use client';
+﻿'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Monitor, Wifi, BatteryCharging, Droplets, Wrench,
   Library, BookOpen, Theater, Trees, Camera,
   CheckCircle2, XCircle, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn, Skeleton, Button } from '@schoolos/ui';
-import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -99,75 +97,27 @@ const facilityConfig: Record<string, { icon: React.ComponentType<{ className?: s
   auditorium: { icon: Theater, label: 'Auditorium', color: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' },
 };
 
-const defaultFacilitiesData: FacilitiesData = {
-  facilities: [
-    { id: '1', name: 'Physics Lab', type: 'lab', operational: true, capacity: 30 },
-    { id: '2', name: 'Chemistry Lab', type: 'lab', operational: true, capacity: 30 },
-    { id: '3', name: 'Biology Lab', type: 'lab', operational: true, capacity: 25 },
-    { id: '4', name: 'Computer Lab A', type: 'computer-lab', operational: true, capacity: 40 },
-    { id: '5', name: 'Computer Lab B', type: 'computer-lab', operational: false, capacity: 40 },
-    { id: '6', name: 'Smart Class 101', type: 'smart-classroom', operational: true },
-    { id: '7', name: 'Smart Class 102', type: 'smart-classroom', operational: true },
-    { id: '8', name: 'Smart Class 103', type: 'smart-classroom', operational: true },
-    { id: '9', name: 'Main Playground', type: 'playground', operational: true },
-    { id: '10', name: 'Central Library', type: 'library', operational: true, capacity: 200 },
-    { id: '11', name: 'School Auditorium', type: 'auditorium', operational: true, capacity: 500 },
-  ],
-  cctv: { totalCameras: 48, activeCameras: 45, status: 'active' },
-  internet: { status: 'up', speed: '150 Mbps', provider: 'Tata Fiber' },
-  powerBackup: { status: 'active', capacity: '50 KVA', lastTested: '2026-07-15' },
-  waterSupply: { status: 'active', source: 'Municipal + Borewell', tankLevel: 78 },
-  maintenanceRequests: [
-    { id: 'm1', facility: 'Computer Lab B', issue: '3 computers not booting', priority: 'high', status: 'in-progress', reportedBy: 'Lab Assistant', reportedAt: '2026-07-18' },
-    { id: 'm2', facility: 'Auditorium', issue: 'AC not cooling', priority: 'medium', status: 'pending', reportedBy: 'Staff', reportedAt: '2026-07-19' },
-    { id: 'm3', facility: 'Playground', issue: 'Goal post repair', priority: 'low', status: 'completed', reportedBy: 'Sports Coach', reportedAt: '2026-07-14' },
-    { id: 'm4', facility: 'Library', issue: 'Ceiling fan replacement', priority: 'low', status: 'completed', reportedBy: 'Librarian', reportedAt: '2026-07-10' },
-  ],
-};
-
 export default function FacilitiesPage() {
-  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
   const [data, setData] = useState<FacilitiesData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!schoolId) return;
-
-    const unsub = SupabaseService.subscribeByField<FacilitiesData>(
-      'analytics', schoolId, 'type', 'facilities',
-      (result) => {
-        if (result) {
-          setData(result);
-          setLoading(false);
-        } else {
-          setData(defaultFacilitiesData);
-          setLoading(false);
-        }
-      },
-    );
-
-    const timeout = setTimeout(() => {
-      if (loading) {
-        setData(defaultFacilitiesData);
-        setLoading(false);
-        toast.info('Using sample facility data');
-      }
-    }, 5000);
-
-    return () => {
-      unsub();
-      clearTimeout(timeout);
-    };
-  }, [schoolId]);
-
-  useEffect(() => {
-    if (error) {
-      toast.error(error);
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/school-admin/facilities');
+      const json = await res.json();
+      if (json.success) setData(json.data);
+    } catch {
+      toast.error('Failed to load facilities data');
+    } finally {
+      setLoading(false);
     }
-  }, [error]);
+  }, []);
 
-  if (authLoading) {
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
@@ -181,25 +131,22 @@ export default function FacilitiesPage() {
     );
   }
 
-  if (error && !data) {
+  if (!data) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
         <AlertTriangle className="h-12 w-12 text-red-500" />
         <p className="text-lg font-medium text-red-600">Failed to load facilities data</p>
-        <p className="text-sm text-muted-foreground">{error}</p>
-        <Button onClick={() => { setError(null); setLoading(true); }}>
+        <Button onClick={fetchData}>
           <RefreshCw className="mr-2 h-4 w-4" /> Retry
         </Button>
       </div>
     );
   }
 
-  const isLoading = loading || !data;
-
-  const groupedFacilities = data?.facilities.reduce<Record<string, Facility[]>>((acc, f) => {
+  const groupedFacilities = (data.facilities || []).reduce<Record<string, Facility[]>>((acc, f) => {
     (acc[f.type] ??= []).push(f);
     return acc;
-  }, {}) ?? {};
+  }, {});
 
   const priorityColor: Record<string, 'destructive' | 'warning' | 'secondary' | 'outline'> = {
     urgent: 'destructive',
@@ -233,46 +180,49 @@ export default function FacilitiesPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {Object.entries(facilityConfig).map(([type, cfg]) => {
-          const items = groupedFacilities[type] ?? [];
-          const Icon = cfg.icon;
-          const operational = items.filter((f) => f.operational).length;
-          return (
-            <motion.div key={type} whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-              <Card className="relative overflow-hidden transition-shadow hover:shadow-lg">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">{cfg.label}</p>
-                      {isLoading ? (
-                        <Skeleton variant="text" className="w-16 h-8" />
-                      ) : (
+      {data.facilities.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <Trees className="mb-2 h-8 w-8" />
+          <p className="text-sm">No facilities configured</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries(facilityConfig).map(([type, cfg]) => {
+            const items = groupedFacilities[type] ?? [];
+            const Icon = cfg.icon;
+            const operational = items.filter((f) => f.operational).length;
+            return (
+              <motion.div key={type} whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
+                <Card className="relative overflow-hidden transition-shadow hover:shadow-lg">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">{cfg.label}</p>
                         <p className="text-3xl font-bold tracking-tight">{items.length}</p>
-                      )}
-                      {!isLoading && items.length > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          {operational} operational / {items.length - operational} inactive
-                        </p>
-                      )}
+                        {items.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {operational} operational / {items.length - operational} inactive
+                          </p>
+                        )}
+                      </div>
+                      <div className={cn('rounded-xl p-3', cfg.color)}>
+                        <Icon className="h-6 w-6" />
+                      </div>
                     </div>
-                    <div className={cn('rounded-xl p-3', cfg.color)}>
-                      <Icon className="h-6 w-6" />
-                    </div>
-                  </div>
-                  {!isLoading && items.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-1.5">
-                      {items.map((f) => (
-                        <StatusDot key={f.id} status={f.operational} />
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          );
-        })}
-      </div>
+                    {items.length > 0 && (
+                      <div className="mt-4 flex flex-wrap gap-1.5">
+                        {items.map((f) => (
+                          <StatusDot key={f.id} status={f.operational} />
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
@@ -284,23 +234,16 @@ export default function FacilitiesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <div className="space-y-2">
-                  <Skeleton variant="text" className="w-20 h-8" />
-                  <Skeleton variant="text" className="w-32" />
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-2xl font-bold">{data.cctv.activeCameras}</p>
+                  <span className="text-sm text-muted-foreground">/ {data.cctv.totalCameras} active</span>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <p className="text-2xl font-bold">{data!.cctv.activeCameras}</p>
-                    <span className="text-sm text-muted-foreground">/ {data!.cctv.totalCameras} active</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusDot status={data!.cctv.status === 'active'} />
-                    <span className="text-xs capitalize text-muted-foreground">{data!.cctv.status}</span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <StatusDot status={data.cctv.status === 'active'} />
+                  <span className="text-xs capitalize text-muted-foreground">{data.cctv.status}</span>
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
         </motion.div>
@@ -314,21 +257,17 @@ export default function FacilitiesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <Skeleton variant="text" className="w-24 h-8" />
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    {data!.internet.status === 'up' ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    )}
-                    <p className="text-lg font-bold capitalize">{data!.internet.status}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{data!.internet.speed} - {data!.internet.provider}</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  {data.internet.status === 'up' ? (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-500" />
+                  )}
+                  <p className="text-lg font-bold capitalize">{data.internet.status}</p>
                 </div>
-              )}
+                <p className="text-xs text-muted-foreground">{data.internet.speed} - {data.internet.provider}</p>
+              </div>
             </CardContent>
           </Card>
         </motion.div>
@@ -342,17 +281,13 @@ export default function FacilitiesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <Skeleton variant="text" className="w-24 h-8" />
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <StatusDot status={data!.powerBackup.status} />
-                    <p className="text-lg font-bold capitalize">{data!.powerBackup.status}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{data!.powerBackup.capacity} (Last tested: {data!.powerBackup.lastTested})</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <StatusDot status={data.powerBackup.status} />
+                  <p className="text-lg font-bold capitalize">{data.powerBackup.status}</p>
                 </div>
-              )}
+                <p className="text-xs text-muted-foreground">{data.powerBackup.capacity} (Last tested: {data.powerBackup.lastTested})</p>
+              </div>
             </CardContent>
           </Card>
         </motion.div>
@@ -366,26 +301,22 @@ export default function FacilitiesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <Skeleton variant="text" className="w-24 h-8" />
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <StatusDot status={data!.waterSupply.status} />
-                    <p className="text-lg font-bold capitalize">{data!.waterSupply.status}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-full max-w-[120px] overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-blue-500 transition-all"
-                        style={{ width: `${data!.waterSupply.tankLevel}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground">{data!.waterSupply.tankLevel}%</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{data!.waterSupply.source}</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <StatusDot status={data.waterSupply.status} />
+                  <p className="text-lg font-bold capitalize">{data.waterSupply.status}</p>
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-full max-w-[120px] overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-blue-500 transition-all"
+                      style={{ width: `${data.waterSupply.tankLevel}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">{data.waterSupply.tankLevel}%</span>
+                </div>
+                <p className="text-xs text-muted-foreground">{data.waterSupply.source}</p>
+              </div>
             </CardContent>
           </Card>
         </motion.div>
@@ -400,20 +331,14 @@ export default function FacilitiesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} variant="text" className="h-16 w-full" />
-                ))}
-              </div>
-            ) : data!.maintenanceRequests.length === 0 ? (
+            {data.maintenanceRequests.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                 <CheckCircle2 className="mb-2 h-8 w-8" />
                 <p className="text-sm">No pending maintenance requests</p>
               </div>
             ) : (
               <div className="divide-y">
-                {data!.maintenanceRequests.map((req) => (
+                {data.maintenanceRequests.map((req) => (
                   <div key={req.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">

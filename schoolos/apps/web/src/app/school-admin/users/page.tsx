@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Search, Eye, Shield, ShieldOff, RotateCcw,
-  Users, ArrowUpDown, ArrowUp, ArrowDown, X, Mail, Phone
+  Users, ArrowUpDown, ArrowUp, ArrowDown, X, Mail, Phone, UserPlus
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -14,9 +14,17 @@ import {
 } from '@schoolos/ui';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { useSchoolList } from '@/features/supabase/hooks/use-school-realtime';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
-import type { SchoolAdminUser } from '@/features/school-admin/types';
+
+interface ApiUser {
+  id: string;
+  email: string;
+  name: string;
+  phone: string | null;
+  status: string;
+  roles: { id: string; name: string; slug: string }[];
+  lastLoginAt: string | null;
+  createdAt: string;
+}
 
 const statusConfig: Record<string, { variant: 'success' | 'warning' | 'destructive' | 'info'; label: string }> = {
   active: { variant: 'success', label: 'Active' },
@@ -54,14 +62,15 @@ const roleColors: Record<string, 'default' | 'secondary' | 'outline' | 'destruct
   parent: 'warning',
 };
 
-type SortField = 'name' | 'role' | 'status' | 'lastLogin' | 'createdAt';
+type SortField = 'name' | 'status' | 'lastLogin' | 'createdAt';
 type SortDir = 'asc' | 'desc';
 
 const PAGE_SIZE = 10;
 
 export default function UsersPage() {
-  const { schoolId, loading: authLoading } = useSchoolAdminAuth();
-  const { data: users, loading: dataLoading } = useSchoolList<SchoolAdminUser>('users', schoolId);
+  const { loading: authLoading } = useSchoolAdminAuth();
+  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -70,8 +79,30 @@ export default function UsersPage() {
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  const [confirmAction, setConfirmAction] = useState<{ type: 'suspend' | 'activate' | 'reset'; user: SchoolAdminUser } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'suspend' | 'activate' | 'reset'; user: ApiUser } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', email: '', password: '', roleSlug: 'teacher' });
+  const [addLoading, setAddLoading] = useState(false);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/school-admin/users');
+      const json = await res.json();
+      if (json.success) {
+        setUsers(json.data);
+      }
+    } catch {
+      toast.error('Failed to load users');
+    } finally {
+      setDataLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const filtered = useMemo(() => {
     let result = [...users];
@@ -85,7 +116,7 @@ export default function UsersPage() {
           u.phone?.toLowerCase().includes(q),
       );
     }
-    if (roleFilter !== 'all') result = result.filter((u) => u.role === roleFilter);
+    if (roleFilter !== 'all') result = result.filter((u) => u.roles.some((r) => r.slug === roleFilter));
     if (statusFilter !== 'all') result = result.filter((u) => u.status === statusFilter);
 
     result.sort((a, b) => {
@@ -94,14 +125,11 @@ export default function UsersPage() {
         case 'name':
           cmp = (a.name || '').localeCompare(b.name || '');
           break;
-        case 'role':
-          cmp = (a.role || '').localeCompare(b.role || '');
-          break;
         case 'status':
           cmp = (a.status || '').localeCompare(b.status || '');
           break;
         case 'lastLogin':
-          cmp = (a.lastLogin || '').localeCompare(b.lastLogin || '');
+          cmp = (a.lastLoginAt || '').localeCompare(b.lastLoginAt || '');
           break;
         case 'createdAt':
           cmp = (a.createdAt || '').localeCompare(b.createdAt || '');
@@ -134,25 +162,60 @@ export default function UsersPage() {
   }
 
   async function handleConfirmAction() {
-    if (!confirmAction || !schoolId) return;
+    if (!confirmAction) return;
     setActionLoading(true);
     const { type, user: target } = confirmAction;
     try {
-      if (type === 'suspend') {
-        await SupabaseService.update('users', target.uid, { status: 'suspended' });
-        toast.success('User suspended');
-      } else if (type === 'activate') {
-        await SupabaseService.update('users', target.uid, { status: 'active' });
-        toast.success('User activated');
-      } else if (type === 'reset') {
-        await SupabaseService.update('users', target.uid, { status: 'inactive' });
-        toast.success('Account reset successfully');
+      let newStatus: string;
+      if (type === 'suspend') newStatus = 'suspended';
+      else if (type === 'activate') newStatus = 'active';
+      else newStatus = 'inactive';
+
+      const res = await fetch('/api/school-admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: target.id, status: newStatus }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`User ${type === 'suspend' ? 'suspended' : type === 'activate' ? 'activated' : 'reset'}`);
+        setUsers((prev) => prev.map((u) => (u.id === target.id ? { ...u, status: newStatus } : u)));
+      } else {
+        toast.error(json.error || 'Action failed');
       }
     } catch {
       toast.error('Action failed');
     } finally {
       setActionLoading(false);
       setConfirmAction(null);
+    }
+  }
+
+  async function handleAddUser() {
+    if (!addForm.name.trim() || !addForm.email.trim() || !addForm.password.trim()) {
+      toast.error('Name, email, and password are required');
+      return;
+    }
+    setAddLoading(true);
+    try {
+      const res = await fetch('/api/school-admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addForm),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('User created successfully');
+        setShowAddModal(false);
+        setAddForm({ name: '', email: '', password: '', roleSlug: 'teacher' });
+        fetchUsers();
+      } else {
+        toast.error(json.error || 'Failed to create user');
+      }
+    } catch {
+      toast.error('Failed to create user');
+    } finally {
+      setAddLoading(false);
     }
   }
 
@@ -167,6 +230,11 @@ export default function UsersPage() {
           { label: 'Dashboard', href: '/school-admin/dashboard' },
           { label: 'Users' },
         ]}
+        actions={
+          <Button onClick={() => setShowAddModal(true)} className="gap-2">
+            <UserPlus className="h-4 w-4" /> Add User
+          </Button>
+        }
       />
 
       <Card>
@@ -249,9 +317,7 @@ export default function UsersPage() {
                       <th className="px-4 py-3 font-medium cursor-pointer hover:text-foreground" onClick={() => toggleSort('name')}>
                         <span className="inline-flex items-center">User <SortIcon field="name" /></span>
                       </th>
-                      <th className="px-4 py-3 font-medium cursor-pointer hover:text-foreground" onClick={() => toggleSort('role')}>
-                        <span className="inline-flex items-center">Role <SortIcon field="role" /></span>
-                      </th>
+                      <th className="px-4 py-3 font-medium">Role</th>
                       <th className="px-4 py-3 font-medium">Email</th>
                       <th className="px-4 py-3 font-medium">Phone</th>
                       <th className="px-4 py-3 font-medium cursor-pointer hover:text-foreground" onClick={() => toggleSort('status')}>
@@ -269,23 +335,19 @@ export default function UsersPage() {
                   <tbody>
                     {paginated.map((u) => {
                       const statusCfg = (statusConfig[u.status] ?? statusConfig.inactive)!;
-                      const roleColor = roleColors[u.role] || 'secondary';
+                      const roleColor = roleColors[u.roles[0]?.slug] || 'secondary';
                       return (
-                        <tr key={u.uid} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                        <tr key={u.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                           <td className="px-4 py-3">
-                            <Link href={`/school-admin/users/profile?id=${u.uid}`} className="flex items-center gap-3">
+                            <Link href={`/school-admin/users/profile?id=${u.id}`} className="flex items-center gap-3">
                               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary shrink-0">
-                                {u.photo ? (
-                                  <img src={u.photo} alt="" className="h-9 w-9 rounded-full object-cover" />
-                                ) : (
-                                  (u.name?.charAt(0) || u.email?.charAt(0) || '?').toUpperCase()
-                                )}
+                                {(u.name?.charAt(0) || u.email?.charAt(0) || '?').toUpperCase()}
                               </div>
                               <span className="text-sm font-medium">{u.name || u.email}</span>
                             </Link>
                           </td>
                           <td className="px-4 py-3">
-                            <Badge variant={roleColor} size="sm">{roleLabels[u.role] || u.role}</Badge>
+                            <Badge variant={roleColor} size="sm">{roleLabels[u.roles[0]?.slug] || u.roles[0]?.name || 'N/A'}</Badge>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1.5">
@@ -307,14 +369,14 @@ export default function UsersPage() {
                             <Badge variant={statusCfg.variant} size="sm">{statusCfg.label}</Badge>
                           </td>
                           <td className="px-4 py-3 text-sm text-muted-foreground">
-                            {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '—'}
+                            {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : '—'}
                           </td>
                           <td className="px-4 py-3 text-sm text-muted-foreground">
                             {new Date(u.createdAt).toLocaleDateString()}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Link href={`/school-admin/users/profile?id=${u.uid}`}>
+                              <Link href={`/school-admin/users/profile?id=${u.id}`}>
                                 <Button variant="ghost" size="icon" className="h-8 w-8">
                                   <Eye className="h-3.5 w-3.5" />
                                 </Button>
@@ -401,6 +463,40 @@ export default function UsersPage() {
               disabled={actionLoading}
             >
               {actionLoading ? 'Processing...' : 'Confirm'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={showAddModal} onOpenChange={() => !addLoading && setShowAddModal(false)} title="Add New User">
+        <div className="pt-2 space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Name *</label>
+            <Input value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} placeholder="Full name" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Email *</label>
+            <Input type="email" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} placeholder="user@school.com" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Password *</label>
+            <Input type="password" value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} placeholder="Min 6 characters" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Role *</label>
+            <Select value={addForm.roleSlug} onValueChange={(v) => setAddForm({ ...addForm, roleSlug: v })}>
+              <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(roleLabels).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setShowAddModal(false)} disabled={addLoading}>Cancel</Button>
+            <Button onClick={handleAddUser} disabled={addLoading}>
+              {addLoading ? 'Creating...' : 'Create User'}
             </Button>
           </div>
         </div>

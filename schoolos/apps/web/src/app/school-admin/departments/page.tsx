@@ -1,20 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Building2, Plus, Users, Pencil, Trash2 } from 'lucide-react';
-import { Card, CardContent, Button, Input, Badge } from '@schoolos/ui';
+import { useState, useEffect, useCallback } from 'react';
+import { Building2, Plus, Users, Pencil, Trash2, BookOpen } from 'lucide-react';
+import { Card, CardContent, Button, Input } from '@schoolos/ui';
 import { toast } from 'sonner';
 import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
+import { PageHeader } from '@/features/school-admin/components/page-header';
 
 interface Department {
   id: string;
   name: string;
-  code: string;
-  headName?: string;
-  employeeCount: number;
-  status: 'active' | 'inactive';
-  createdAt: string;
+  code: string | null;
+  description: string | null;
+  _count?: { subjects: number; employees: number };
 }
 
 export default function DepartmentsPage() {
@@ -23,21 +21,29 @@ export default function DepartmentsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editDept, setEditDept] = useState<Department | null>(null);
-  const [form, setForm] = useState({ name: '', code: '', headName: '' });
+  const [form, setForm] = useState({ name: '', code: '', description: '' });
+
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const res = await fetch('/api/school-admin/departments');
+      const json = await res.json();
+      if (json.success) {
+        setDepartments(json.data);
+      }
+    } catch {
+      toast.error('Failed to load departments');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!schoolId) return;
-    const unsub = SupabaseService.subscribeList<Department>(
-      'departments', schoolId, (items) => {
-        setDepartments(items);
-        setLoading(false);
-      },
-    );
-    return () => unsub();
-  }, [schoolId]);
+    fetchDepartments();
+  }, [schoolId, fetchDepartments]);
 
   const resetForm = () => {
-    setForm({ name: '', code: '', headName: '' });
+    setForm({ name: '', code: '', description: '' });
     setEditDept(null);
     setShowForm(false);
   };
@@ -48,18 +54,19 @@ export default function DepartmentsPage() {
       return;
     }
     try {
-      if (editDept) {
-        await SupabaseService.update('departments', editDept.id, {
-          ...form, updatedAt: new Date().toISOString(),
-        });
-        toast.success('Department updated');
+      const res = await fetch('/api/school-admin/departments', {
+        method: editDept ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editDept ? { id: editDept.id, ...form } : { ...form, schoolId }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(editDept ? 'Department updated' : 'Department created');
+        resetForm();
+        fetchDepartments();
       } else {
-        await SupabaseService.insert('departments', {
-          ...form, school_id: schoolId, employeeCount: 0, status: 'active', createdAt: new Date().toISOString(),
-        });
-        toast.success('Department created');
+        toast.error(json.error || 'Failed to save');
       }
-      resetForm();
     } catch {
       toast.error('Failed to save department');
     }
@@ -67,8 +74,18 @@ export default function DepartmentsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await SupabaseService.update('departments', id, { status: 'inactive' });
-      toast.success('Department deactivated');
+      const res = await fetch('/api/school-admin/departments', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Department deactivated');
+        fetchDepartments();
+      } else {
+        toast.error(json.error || 'Failed to deactivate');
+      }
     } catch {
       toast.error('Failed to deactivate department');
     }
@@ -76,15 +93,19 @@ export default function DepartmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Departments</h1>
-          <p className="text-sm text-muted-foreground">Manage school departments and their heads</p>
-        </div>
-        <Button onClick={() => { resetForm(); setShowForm(!showForm); }} className="gap-2">
-          <Plus className="h-4 w-4" /> {showForm ? 'Cancel' : 'Add Department'}
-        </Button>
-      </div>
+      <PageHeader
+        title="Academics"
+        description="Manage academic departments, subjects, and assignments"
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/school-admin/dashboard' },
+          { label: 'Academics' },
+        ]}
+        actions={
+          <Button onClick={() => { resetForm(); setShowForm(!showForm); }} className="gap-2">
+            <Plus className="h-4 w-4" /> {showForm ? 'Cancel' : 'Add Department'}
+          </Button>
+        }
+      />
 
       {showForm && (
         <Card className="border-primary/20">
@@ -100,8 +121,8 @@ export default function DepartmentsPage() {
                 <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. SCI" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Department Head</label>
-                <Input value={form.headName} onChange={(e) => setForm({ ...form, headName: e.target.value })} placeholder="Enter name" />
+                <label className="text-sm font-medium">Description</label>
+                <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Description" />
               </div>
             </div>
             <div className="flex gap-2 justify-end">
@@ -126,7 +147,7 @@ export default function DepartmentsPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {departments.filter((d) => d.status === 'active').map((dept) => (
+          {departments.map((dept) => (
             <Card key={dept.id} className="transition-all hover:shadow-md">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
@@ -141,7 +162,7 @@ export default function DepartmentsPage() {
                   </div>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => { setEditDept(dept); setForm({ name: dept.name, code: dept.code, headName: dept.headName || '' }); setShowForm(true); }}
+                      onClick={() => { setEditDept(dept); setForm({ name: dept.name, code: dept.code || '', description: dept.description || '' }); setShowForm(true); }}
                       className="rounded p-1.5 text-muted-foreground hover:bg-muted"
                     >
                       <Pencil className="h-4 w-4" />
@@ -157,11 +178,12 @@ export default function DepartmentsPage() {
                 <div className="mt-4 flex items-center gap-4 text-sm">
                   <div className="flex items-center gap-1.5">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>{dept.employeeCount} members</span>
+                    <span>{(dept as any)._count?.employees ?? 0} members</span>
                   </div>
-                  {dept.headName && (
-                    <Badge variant="secondary" className="text-xs">{dept.headName}</Badge>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    <span>{(dept as any)._count?.subjects ?? 0} subjects</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>

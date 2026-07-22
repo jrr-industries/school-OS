@@ -11,9 +11,7 @@ import {
 } from '@schoolos/ui';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import { toast } from 'sonner';
-import type { Notification } from '@/features/school-admin/types';
 
 const TARGET_OPTIONS = [
   { value: 'all', label: 'Entire School', icon: Users },
@@ -67,24 +65,30 @@ const initialForm: FormState = {
 };
 
 export default function CommunicationPage() {
-  const { user, schoolId } = useSchoolAdminAuth();
+  const { user: _user } = useSchoolAdminAuth();
   const [form, setForm] = useState<FormState>(initialForm);
   const [sending, setSending] = useState(false);
-  const [messages, setMessages] = useState<Notification[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const fetchMessages = useCallback(async () => {
+    try {
+      const res = await fetch('/api/school-admin/notifications');
+      const json = await res.json();
+      if (json.success) {
+        setMessages(json.data);
+      }
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!schoolId) return;
-    const unsub = SupabaseService.subscribeList<Notification>(
-      'notifications', schoolId,
-      (items) => {
-        setMessages(items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-        setLoading(false);
-      },
-    );
-    return unsub;
-  }, [schoolId]);
+    fetchMessages();
+  }, [fetchMessages]);
 
   const validate = useCallback(() => {
     const errs: Record<string, string> = {};
@@ -96,23 +100,27 @@ export default function CommunicationPage() {
 
   const handleSend = async () => {
     if (!validate()) return;
-    if (!schoolId || !user) return;
     setSending(true);
     try {
-      await SupabaseService.insert('notifications', {
-        school_id: schoolId,
-        title: form.title.trim(),
-        message: form.message.trim(),
-        type: form.type,
-        priority: form.priority,
-        targetRole: form.targetRole,
-        createdBy: user.uid,
-        createdAt: new Date().toISOString(),
-        read: false,
-        archived: false,
+      const res = await fetch('/api/school-admin/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: form.title.trim(),
+          message: form.message.trim(),
+          type: form.type,
+          priority: form.priority,
+          targetRole: form.targetRole,
+        }),
       });
-      toast.success('Announcement sent successfully');
-      setForm(initialForm);
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Announcement sent successfully');
+        setForm(initialForm);
+        fetchMessages();
+      } else {
+        toast.error(json.error || 'Failed to send');
+      }
     } catch {
       toast.error('Failed to send announcement');
     } finally {

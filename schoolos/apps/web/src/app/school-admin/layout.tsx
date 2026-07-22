@@ -5,12 +5,11 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   LayoutDashboard, School, Users, Settings, Building2,
-  CalendarDays, BookOpen, ClipboardCheck, IndianRupee, Bus,
-  MessageSquare, Bell, ScrollText, BarChart3, CreditCard,
+  CalendarDays, BookOpen, ClipboardCheck, Bus,
+  MessageSquare, Bell, ScrollText, CreditCard,
   UserCircle, LogOut, Sun, Moon, Menu, X, ChevronDown, ChevronRight,
-  BookMarked, FileSpreadsheet, Trophy, Wallet, PiggyBank,
-  Library, Monitor, Shield, Calendar, HeartPulse,
-  ChefHat
+  BookMarked, Trophy, PiggyBank,
+  Library, Monitor, HeartPulse, ChefHat,
 } from 'lucide-react';
 import { Avatar, cn } from '@schoolos/ui';
 import { SchoolAdminAuthProvider, useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
@@ -53,7 +52,7 @@ const navSections: NavSection[] = [
     items: [{ label: 'Settings', href: '/school-admin/settings', icon: Settings }],
   },
   {
-    title: 'Departments',
+    title: 'Academics',
     icon: Building2,
     items: [{ label: 'Departments', href: '/school-admin/departments', icon: Building2 }],
   },
@@ -65,37 +64,30 @@ const navSections: NavSection[] = [
   {
     title: 'Classes',
     icon: BookOpen,
-    items: [{ label: 'View Classes', href: '/school-admin/classes', icon: BookOpen, badge: 'View Only' }],
+    items: [{ label: 'Classes', href: '/school-admin/classes', icon: BookOpen }],
   },
   {
     title: 'Subjects',
     icon: BookMarked,
-    items: [{ label: 'View Subjects', href: '/school-admin/subjects', icon: BookMarked, badge: 'View Only' }],
+    items: [{ label: 'Subjects', href: '/school-admin/subjects', icon: BookMarked }],
   },
   {
     title: 'Attendance',
     icon: ClipboardCheck,
-    items: [{ label: 'View Attendance', href: '/school-admin/attendance', icon: ClipboardCheck, badge: 'View Only' }],
+    items: [{ label: 'Attendance', href: '/school-admin/attendance', icon: ClipboardCheck }],
   },
   {
-    title: 'Fee Reports',
-    icon: IndianRupee,
-    items: [
-      { label: 'Fee Collection', href: '/school-admin/fee-reports', icon: IndianRupee },
-      { label: 'Pending Fees', href: '/school-admin/fee-reports/pending', icon: FileSpreadsheet },
-    ],
-  },
-  {
-    title: 'Transport Reports',
+    title: 'Transport',
     icon: Bus,
     items: [
-      { label: 'Transport', href: '/school-admin/transport-reports', icon: Bus },
+      { label: 'Transport', href: '/school-admin/transport', icon: Bus },
     ],
   },
   {
     title: 'Communication',
     icon: MessageSquare,
     items: [
+      { label: 'Announcements', href: '/school-admin/announcements', icon: Bell },
       { label: 'Broadcast', href: '/school-admin/communication', icon: MessageSquare },
     ],
   },
@@ -125,19 +117,9 @@ const navSections: NavSection[] = [
     items: [{ label: 'Lunch Dashboard', href: '/school-admin/lunch-management', icon: ChefHat }],
   },
   {
-    title: 'Fee Dashboard',
-    icon: Wallet,
-    items: [{ label: 'Fee Overview', href: '/school-admin/fee-dashboard', icon: Wallet }],
-  },
-  {
     title: 'Salary',
     icon: PiggyBank,
     items: [{ label: 'Payroll', href: '/school-admin/salary', icon: PiggyBank }],
-  },
-  {
-    title: 'Finance',
-    icon: BarChart3,
-    items: [{ label: 'Finance', href: '/school-admin/finance', icon: BarChart3 }],
   },
   {
     title: 'Library',
@@ -148,28 +130,6 @@ const navSections: NavSection[] = [
     title: 'Facilities',
     icon: Monitor,
     items: [{ label: 'Facilities', href: '/school-admin/facilities', icon: Monitor }],
-  },
-  {
-    title: 'HR',
-    icon: Users,
-    items: [{ label: 'HR Dashboard', href: '/school-admin/hr-dashboard', icon: Users }],
-  },
-  {
-    title: 'Security',
-    icon: Shield,
-    items: [{ label: 'Security', href: '/school-admin/security-dashboard', icon: Shield }],
-  },
-  {
-    title: 'Calendar',
-    icon: Calendar,
-    items: [{ label: 'Calendar', href: '/school-admin/calendar', icon: Calendar }],
-  },
-  {
-    title: 'Analytics',
-    icon: BarChart3,
-    items: [
-      { label: 'Analytics', href: '/school-admin/analytics', icon: BarChart3 },
-    ],
   },
   {
     title: 'Subscription',

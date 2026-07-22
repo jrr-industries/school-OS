@@ -26,7 +26,8 @@ async function verifyToken(token) {
       false,
       ['sign'],
     );
-    const expectedSigBuffer = await subtle.sign('HMAC', key, new TextEncoder().encode(encodedPayload));
+    const rawPayload = Buffer.from(encodedPayload, 'base64').toString();
+    const expectedSigBuffer = await subtle.sign('HMAC', key, new TextEncoder().encode(rawPayload));
     const expectedSig = Buffer.from(expectedSigBuffer).toString('base64');
     if (signature !== expectedSig) return null;
     const payload = Buffer.from(encodedPayload, 'base64').toString();
@@ -118,7 +119,7 @@ io.on('connection', (socket) => {
         data: { updatedAt: new Date() },
       });
 
-      io.to(`conversation:${conversationId}`).emit('chat:message', message);
+      socket.to(`conversation:${conversationId}`).emit('chat:message', message);
       callback?.({ success: true, data: message });
     } catch (err) {
       callback?.({ error: err.message });

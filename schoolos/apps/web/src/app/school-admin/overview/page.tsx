@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   School, MapPin, Phone, Mail, Globe, CalendarDays, BookOpen,
@@ -9,8 +9,34 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn, Button } from '@schoolos/ui';
 import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
 import type { SchoolData, SubscriptionData } from '@/features/school-admin/types';
+
+interface DashboardResponse {
+  schoolId: string;
+  name: string;
+  code: string;
+  board: string;
+  type: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  principalName: string;
+  academicYear: string;
+  status: string;
+  studentCount: number;
+  teacherCount: number;
+  parentCount: number;
+  staffCount: number;
+  activeUsers: number;
+  createdAt: string;
+  subscription: {
+    plan: string;
+    status: string;
+    startDate: string;
+    endDate: string | null;
+  } | null;
+}
 
 export default function SchoolOverview() {
   const { schoolId } = useSchoolAdminAuth();
@@ -18,20 +44,59 @@ export default function SchoolOverview() {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!schoolId) return;
-
-    const unsubSchool = SupabaseService.subscribe<SchoolData>('schools', schoolId, (data) => {
-      if (data) setSchool(data);
+    try {
+      const res = await fetch('/api/school-admin/dashboard');
+      const json = await res.json();
+      if (json.success) {
+        const d: DashboardResponse = json.data;
+        setSchool({
+          schoolId: d.schoolId,
+          name: d.name,
+          code: d.code,
+          board: d.board,
+          type: d.type,
+          address: d.address,
+          phone: d.phone,
+          email: d.email,
+          website: d.website,
+          principalName: d.principalName,
+          academicYear: d.academicYear,
+          status: d.status as 'active' | 'inactive' | 'suspended',
+          studentCount: d.studentCount,
+          teacherCount: d.teacherCount,
+          parentCount: d.parentCount,
+          staffCount: d.staffCount,
+          createdAt: d.createdAt,
+          language: 'en',
+          timezone: 'UTC',
+          theme: 'light',
+        });
+        if (d.subscription) {
+          setSubscription({
+            plan: d.subscription.plan as any,
+            status: d.subscription.status as any,
+            startDate: d.subscription.startDate,
+            endDate: d.subscription.endDate || '',
+            storageLimit: 0,
+            storageUsed: 0,
+            userLimit: 0,
+            features: [],
+            paymentHistory: [],
+          });
+        }
+      }
+    } catch {
+      // handled by empty state
+    } finally {
       setLoading(false);
-    });
-
-    const unsubSub = SupabaseService.subscribeByField<SubscriptionData>(
-      'subscription', schoolId, 'school_id', schoolId, setSubscription,
-    );
-
-    return () => { unsubSchool(); unsubSub(); };
+    }
   }, [schoolId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   if (loading) {
     return (
@@ -93,13 +158,9 @@ export default function SchoolOverview() {
 
       <div className="rounded-xl border bg-white p-6 dark:bg-slate-900 shadow-sm">
         <div className="flex flex-col items-center gap-4 sm:flex-row">
-          {school.logo ? (
-            <img src={school.logo} alt={school.name} className="h-20 w-20 rounded-xl object-cover" />
-          ) : (
-            <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-primary/10">
-              <School className="h-10 w-10 text-primary" />
-            </div>
-          )}
+          <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-primary/10">
+            <School className="h-10 w-10 text-primary" />
+          </div>
           <div className="text-center sm:text-left">
             <h2 className="text-2xl font-bold">{school.name}</h2>
             <p className="text-sm text-muted-foreground">{school.code} &middot; {school.board} &middot; {school.type}</p>
@@ -232,7 +293,7 @@ export default function SchoolOverview() {
             </div>
             <div className="rounded-lg border p-4">
               <p className="text-xs text-muted-foreground">Last Updated</p>
-              <p className="text-sm font-medium">{school.updatedAt ? new Date(school.updatedAt).toLocaleString() : '-'}</p>
+              <p className="text-sm font-medium">{school.createdAt ? new Date(school.createdAt).toLocaleString() : '-'}</p>
             </div>
           </div>
         </CardContent>

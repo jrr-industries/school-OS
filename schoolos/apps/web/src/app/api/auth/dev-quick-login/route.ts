@@ -3,9 +3,11 @@ import type { NextRequest } from 'next/server';
 import { createDevSession, setDevSessionCookie } from '@/lib/dev-session';
 import { prisma } from '@schoolos/database';
 
-const ROLE_MAP: Record<string, { role: 'SUPER_ADMIN' | 'SCHOOL_ADMIN' | 'TEACHER' | 'STAFF' | 'PARENT' | 'STUDENT'; label: string; devEmail: string }> = {
+const ROLE_MAP: Record<string, { role: 'SUPER_ADMIN' | 'SCHOOL_ADMIN' | 'PRINCIPAL' | 'VICE_PRINCIPAL' | 'TEACHER' | 'STAFF' | 'PARENT' | 'STUDENT'; label: string; devEmail: string }> = {
   'super_admin': { role: 'SUPER_ADMIN', label: 'Super Admin', devEmail: 'admin@schoolos.dev' },
   'school_admin': { role: 'SCHOOL_ADMIN', label: 'School Admin', devEmail: 'schooladmin@schoolos.dev' },
+  'principal': { role: 'PRINCIPAL', label: 'Principal', devEmail: 'principal@schoolos.dev' },
+  'vice_principal': { role: 'VICE_PRINCIPAL', label: 'Vice Principal', devEmail: 'viceprincipal@schoolos.dev' },
   'teacher': { role: 'TEACHER', label: 'Teacher', devEmail: 'teacher@schoolos.dev' },
   'staff': { role: 'STAFF', label: 'Staff', devEmail: 'staff@schoolos.dev' },
   'parent': { role: 'PARENT', label: 'Parent', devEmail: 'parent@schoolos.dev' },
@@ -84,6 +86,8 @@ export async function POST(request: NextRequest) {
 
     const redirectMap: Record<string, string> = {
       school_admin: '/school-admin/dashboard',
+      principal: '/principal/dashboard',
+      vice_principal: '/vice-principal/dashboard',
       teacher: '/school-admin/dashboard',
       staff: '/school-admin/dashboard',
       parent: '/school-admin/dashboard',

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   UserCircle, Camera, Phone, Sun, Moon, Monitor,
   Lock, Key, ShieldCheck, Smartphone, Laptop, LogOut,
-  Save, CheckCircle2, AlertCircle, ExternalLink,
+  Save, CheckCircle2, ExternalLink,
 } from 'lucide-react';
 import {
   Card, CardHeader, CardTitle, CardContent, Badge, Button,
@@ -13,8 +13,6 @@ import {
 } from '@schoolos/ui';
 import { toast } from 'sonner';
 import { useSchoolAdminAuth } from '@/features/supabase/hooks/use-school-admin-auth';
-import { SupabaseService } from '@/features/supabase/services/supabase.service';
-import type { SchoolAdminUser } from '@/features/school-admin/types';
 import { PageHeader } from '@/features/school-admin/components/page-header';
 
 interface Session {
@@ -50,13 +48,14 @@ const themes = [
 ];
 
 export default function ProfilePage() {
-  const { user, schoolId, loading: authLoading } = useSchoolAdminAuth();
-  const [profile, setProfile] = useState<SchoolAdminUser | null>(null);
+  const { user: authUser, loading: authLoading } = useSchoolAdminAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('');
   const [language, setLanguage] = useState('en');
   const [theme, setTheme] = useState('system');
   const [photoUrl, setPhotoUrl] = useState('');
@@ -67,39 +66,35 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
-  const [sessions] = useState<Session[]>([
-    { id: '1', device: 'Windows PC', browser: 'Chrome 128', ip: '192.168.1.100', lastActive: new Date().toISOString(), current: true },
-    { id: '2', device: 'iPhone 15', browser: 'Safari', ip: '192.168.1.101', lastActive: new Date(Date.now() - 86400000).toISOString(), current: false },
-  ]);
-
-  const [devices] = useState<Device[]>([
-    { id: '1', name: 'Dell XPS 15', type: 'Laptop', os: 'Windows 11', lastSeen: new Date().toISOString() },
-    { id: '2', name: 'iPhone 15', type: 'Phone', os: 'iOS 18', lastSeen: new Date(Date.now() - 86400000).toISOString() },
-    { id: '3', name: 'iPad Air', type: 'Tablet', os: 'iPadOS 18', lastSeen: new Date(Date.now() - 172800000).toISOString() },
-  ]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!schoolId) return;
-    const unsub = SupabaseService.subscribe('schools', schoolId, (data) => {
-      if (data) {
-        setLanguage((data.language as string) || 'en');
-        setTheme((data.theme as string) || 'system');
+  const fetchProfile = useCallback(async () => {
+    try {
+      const res = await fetch('/api/school-admin/profile');
+      const json = await res.json();
+      if (json.success) {
+        const { user, sessions: sess, devices: dev } = json.data;
+        setName(user.name || '');
+        setPhone(user.phone || '');
+        setEmail(user.email || '');
+        setRole(user.role || 'SCHOOL_ADMIN');
+        setPhotoUrl(user.avatar || '');
+        setLanguage(json.data.language || 'en');
+        setTheme(json.data.theme || 'system');
+        setSessions(sess || []);
+        setDevices(dev || []);
       }
-    });
-    return () => unsub();
-  }, [schoolId]);
-
-  useEffect(() => {
-    if (user) {
-      setProfile(user);
-      setName(user.name || '');
-      setPhone(user.phone || '');
-      setPhotoUrl(user.photo || '');
+    } catch {
+      // handled by empty state
+    } finally {
+      setLoading(false);
     }
-    if (!authLoading) setLoading(false);
-  }, [user, authLoading]);
+  }, []);
+
+  useEffect(() => { if (!authLoading) fetchProfile(); }, [authLoading, fetchProfile]);
 
   const handlePhotoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -120,17 +115,23 @@ export default function ProfilePage() {
   }, [name, phone]);
 
   const handleSaveProfile = useCallback(async () => {
-    if (!validateForm() || !schoolId) return;
+    if (!validateForm()) return;
     setSaving(true);
     try {
-      await new Promise((r) => setTimeout(r, 1000));
-      toast.success('Profile updated successfully');
+      const res = await fetch('/api/school-admin/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), phone, photo: photoPreview || photoUrl, language }),
+      });
+      const json = await res.json();
+      if (json.success) toast.success('Profile updated successfully');
+      else toast.error(json.error || 'Failed to update');
     } catch {
       toast.error('Failed to update profile');
     } finally {
       setSaving(false);
     }
-  }, [validateForm, schoolId]);
+  }, [validateForm, name, phone, photoPreview, photoUrl, language]);
 
   const handleChangePassword = useCallback(async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -181,21 +182,6 @@ export default function ProfilePage() {
     );
   }
 
-  if (!profile) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Profile" description="Manage your profile" />
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <AlertCircle className="h-16 w-16 mb-4" />
-            <h2 className="text-xl font-semibold">Profile Not Found</h2>
-            <p className="mt-1 text-sm">Unable to load profile data.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -233,9 +219,9 @@ export default function ProfilePage() {
                   <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
                 </div>
                 <div className="text-center sm:text-left">
-                  <h3 className="text-lg font-semibold">{profile.name}</h3>
-                  <p className="text-sm text-muted-foreground">{profile.email}</p>
-                  <Badge variant="outline" className="mt-1 capitalize">{profile.role?.replace('_', ' ')}</Badge>
+                  <h3 className="text-lg font-semibold">{name || authUser?.name}</h3>
+                  <p className="text-sm text-muted-foreground">{email}</p>
+                  <Badge variant="outline" className="mt-1 capitalize">{role.replace('_', ' ')}</Badge>
                 </div>
               </div>
 
@@ -359,7 +345,7 @@ export default function ProfilePage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium">Google</p>
-                    <p className="text-xs text-muted-foreground">{profile.email}</p>
+                    <p className="text-xs text-muted-foreground">{email}</p>
                   </div>
                 </div>
                 <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800">
@@ -378,33 +364,37 @@ export default function ProfilePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {sessions.map((session) => (
-                <div key={session.id} className="flex items-start gap-3 rounded-lg border p-3">
-                  <div className={cn('rounded-lg p-2', session.current ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
-                    {session.device.includes('iPhone') || session.device.includes('Phone')
-                      ? <Smartphone className="h-4 w-4" />
-                      : <Laptop className="h-4 w-4" />
-                    }
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{session.device}</p>
-                      {session.current && (
-                        <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400">
-                          Current
-                        </Badge>
-                      )}
+              {sessions.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No active sessions</p>
+              ) : (
+                sessions.map((session) => (
+                  <div key={session.id} className="flex items-start gap-3 rounded-lg border p-3">
+                    <div className={cn('rounded-lg p-2', session.current ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
+                      {session.device.includes('iPhone') || session.device.includes('Phone')
+                        ? <Smartphone className="h-4 w-4" />
+                        : <Laptop className="h-4 w-4" />
+                      }
                     </div>
-                    <p className="text-xs text-muted-foreground">{session.browser} &middot; {session.ip}</p>
-                    <p className="text-[10px] text-muted-foreground">Last active: {new Date(session.lastActive).toLocaleString()}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{session.device}</p>
+                        {session.current && (
+                          <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400">
+                            Current
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{session.browser} &middot; {session.ip}</p>
+                      <p className="text-[10px] text-muted-foreground">Last active: {new Date(session.lastActive).toLocaleString()}</p>
+                    </div>
+                    {!session.current && (
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600">
+                        <LogOut className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
-                  {!session.current && (
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600">
-                      <LogOut className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -416,19 +406,23 @@ export default function ProfilePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {devices.map((device) => (
-                <div key={device.id} className="flex items-center gap-3 rounded-lg border p-3">
-                  <div className="rounded-lg bg-muted p-2 text-muted-foreground">
-                    {device.type === 'Laptop' ? <Laptop className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}
+              {devices.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No devices registered</p>
+              ) : (
+                devices.map((device) => (
+                  <div key={device.id} className="flex items-center gap-3 rounded-lg border p-3">
+                    <div className="rounded-lg bg-muted p-2 text-muted-foreground">
+                      {device.type === 'Laptop' ? <Laptop className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{device.name}</p>
+                      <p className="text-xs text-muted-foreground">{device.os}</p>
+                      <p className="text-[10px] text-muted-foreground">Last seen: {new Date(device.lastSeen).toLocaleDateString()}</p>
+                    </div>
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{device.name}</p>
-                    <p className="text-xs text-muted-foreground">{device.os}</p>
-                    <p className="text-[10px] text-muted-foreground">Last seen: {new Date(device.lastSeen).toLocaleDateString()}</p>
-                  </div>
-                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </div>
