@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { PageHeader, DataTable } from '@/features/super-admin/components';
-import { Plus, Edit, Eye, Loader2, AlertCircle, Search } from 'lucide-react';
+import { Plus, Edit, Eye, Loader2, AlertCircle, Search, Trash2, X } from 'lucide-react';
 import { Button } from '@schoolos/ui';
 
 interface SchoolRow {
@@ -35,6 +35,9 @@ export default function SchoolsPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
+  const [deleteTarget, setDeleteTarget] = useState<SchoolRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const fetchSchools = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -62,9 +65,23 @@ export default function SchoolsPage() {
     }
   }, [page, search]);
 
-  useEffect(() => {
-    fetchSchools();
-  }, [fetchSchools]);
+  useEffect(() => { fetchSchools(); }, [fetchSchools]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/schools/${deleteTarget.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!data.success) { setError(data.error ?? 'Failed to delete'); return; }
+      setDeleteTarget(null);
+      fetchSchools();
+    } catch {
+      setError('Network error');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const columns = [
     {
@@ -173,6 +190,13 @@ export default function SchoolsPage() {
                 <Link href={`/admin/schools/${row.id}/edit`} className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800 inline-flex" aria-label="Edit">
                   <Edit className="h-4 w-4" />
                 </Link>
+                <button
+                  onClick={() => setDeleteTarget(row)}
+                  className="p-2 rounded hover:bg-red-100 dark:hover:bg-red-950 inline-flex text-red-600 dark:text-red-400"
+                  aria-label="Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             )}
             pagination={{
@@ -205,6 +229,49 @@ export default function SchoolsPage() {
             </div>
           )}
         </>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !deleting && setDeleteTarget(null)} />
+          <div className="relative w-full max-w-md rounded-xl border bg-card p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10">
+                  <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">Delete School</h3>
+                  <p className="text-sm text-muted-foreground">This will soft-delete the school.</p>
+                </div>
+              </div>
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting} className="rounded-md p-1 text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-4 rounded-lg bg-muted/50 p-4 text-sm">
+              <p><span className="text-muted-foreground">School:</span> <span className="font-medium text-foreground">{deleteTarget.name}</span></p>
+              <p className="mt-1"><span className="text-muted-foreground">Slug:</span> <span className="font-medium text-foreground">{deleteTarget.slug}</span></p>
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {deleting ? 'Deleting...' : 'Confirm Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

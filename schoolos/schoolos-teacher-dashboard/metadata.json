@@ -1,0 +1,6 @@
+{
+  "name": "SchoolOS Teacher Dashboard",
+  "description": "Enterprise-grade Teacher Dashboard & Teaching Command Center for SchoolOS featuring Attendance Heatmap, Live Timetable, AI Teaching Assistant, and Analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

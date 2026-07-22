@@ -1,28 +1,66 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { MessageSquare, Send, Users, Building2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { MessageSquare, Send, Users, Loader2, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 
-interface SentMessage {
+interface SmsItem {
   id: string;
-  message: string;
-  target: string;
-  recipients: number;
-  delivered: number;
-  failed: number;
-  sentAt: string;
-  status: 'delivered' | 'partial' | 'failed';
+  title: string;
+  message: string | null;
+  createdAt: string;
 }
 
-const sentMessages: SentMessage[] = [
-  { id: '1', message: 'Emergency closure tomorrow due to weather. All schools remain closed.', target: 'All Schools', recipients: 156, delivered: 152, failed: 4, sentAt: '2026-07-18 08:30', status: 'partial' },
-  { id: '2', message: 'Parent-teacher meetings scheduled for next week. Please confirm availability.', target: 'Teachers', recipients: 3840, delivered: 3840, failed: 0, sentAt: '2026-07-17 14:00', status: 'delivered' },
-  { id: '3', message: 'Term 3 report cards are due by Friday. Upload to the portal.', target: 'School Admins', recipients: 312, delivered: 310, failed: 2, sentAt: '2026-07-16 10:15', status: 'partial' },
-  { id: '4', message: 'Test broadcast - please ignore.', target: 'All Users', recipients: 52300, delivered: 52100, failed: 200, sentAt: '2026-07-14 09:00', status: 'failed' },
-  { id: '5', message: 'Bus schedule changes effective Monday. Check the portal for details.', target: 'Parents', recipients: 28000, delivered: 27980, failed: 20, sentAt: '2026-07-12 16:45', status: 'partial' },
-];
-
 export default function SMSBroadcastPage() {
+  const [data, setData] = useState<SmsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [target, setTarget] = useState('All Users');
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/notifications?type=warning&category=communication&limit=50');
+      const json = await res.json();
+      if (json.success) setData(json.data);
+      else setError(json.error || 'Failed to load');
+    } catch {
+      setError('Failed to fetch sent messages');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleSend = async () => {
+    if (!message.trim()) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/admin/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `SMS: ${target}`,
+            message: message,
+            type: 'warning',
+            category: 'communication',
+            metadata: { channel: 'sms', target },
+          }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setMessage('');
+        fetchData();
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -41,27 +79,22 @@ export default function SMSBroadcastPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Target Audience</label>
-              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              <select value={target} onChange={(e) => setTarget(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 <option>All Users</option>
                 <option>All Schools</option>
                 <option>Teachers</option>
                 <option>Parents</option>
                 <option>School Admins</option>
-                <option>Specific School...</option>
               </select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Message</label>
-              <textarea
-                rows={5}
-                placeholder="Type your SMS message here... (160 characters recommended)"
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              />
-              <p className="text-xs text-muted-foreground text-right">0 / 160 characters</p>
+              <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} placeholder="Type your SMS message here... (160 characters recommended)" className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+              <p className="text-xs text-muted-foreground text-right">{message.length} / 160 characters</p>
             </div>
             <div className="flex justify-end pt-2">
-              <button className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors gap-2">
-                <Send className="h-4 w-4" />
+              <button onClick={handleSend} disabled={submitting || !message.trim()} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors gap-2 disabled:opacity-50">
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 Send Broadcast
               </button>
             </div>
@@ -76,34 +109,14 @@ export default function SMSBroadcastPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Total Users</span>
-              <span className="text-sm font-bold">52,300</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Schools</span>
-              <span className="text-sm font-bold">156</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Teachers</span>
-              <span className="text-sm font-bold">3,840</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Parents</span>
-              <span className="text-sm font-bold">28,000</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">School Admins</span>
-              <span className="text-sm font-bold">312</span>
-            </div>
+            <div className="flex items-center justify-between"><span className="text-sm">Total Users</span><span className="text-sm font-bold">52,300</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm">Schools</span><span className="text-sm font-bold">156</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm">Teachers</span><span className="text-sm font-bold">3,840</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm">Parents</span><span className="text-sm font-bold">28,000</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm">School Admins</span><span className="text-sm font-bold">312</span></div>
             <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Monthly SMS Used</span>
-                <span className="text-sm font-bold">12,450 / 50,000</span>
-              </div>
-              <div className="mt-2 h-2 rounded-full bg-slate-100 dark:bg-slate-800">
-                <div className="h-2 rounded-full bg-primary" style={{ width: '25%' }} />
-              </div>
+              <div className="flex items-center justify-between"><span className="text-sm font-medium">Monthly SMS Used</span><span className="text-sm font-bold">12,450 / 50,000</span></div>
+              <div className="mt-2 h-2 rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-2 rounded-full bg-primary" style={{ width: '25%' }} /></div>
             </div>
           </CardContent>
         </Card>
@@ -117,47 +130,41 @@ export default function SMSBroadcastPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left font-medium text-muted-foreground pb-3 pr-4">Message</th>
-                  <th className="text-left font-medium text-muted-foreground pb-3 pr-4">Target</th>
-                  <th className="text-right font-medium text-muted-foreground pb-3 pr-4">Recipients</th>
-                  <th className="text-right font-medium text-muted-foreground pb-3 pr-4">Delivered</th>
-                  <th className="text-right font-medium text-muted-foreground pb-3 pr-4">Failed</th>
-                  <th className="text-left font-medium text-muted-foreground pb-3 pr-4">Status</th>
-                  <th className="text-left font-medium text-muted-foreground pb-3">Sent At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sentMessages.map((m) => (
-                  <tr key={m.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0">
-                    <td className="py-3 pr-4 max-w-xs truncate font-medium">{m.message}</td>
-                    <td className="py-3 pr-4 text-muted-foreground">
-                      <span className="inline-flex items-center gap-1 text-xs">
-                        <Building2 className="h-3 w-3" />
-                        {m.target}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4 text-right">{m.recipients.toLocaleString()}</td>
-                    <td className="py-3 pr-4 text-right text-emerald-600">{m.delivered.toLocaleString()}</td>
-                    <td className="py-3 pr-4 text-right text-red-500">{m.failed.toLocaleString()}</td>
-                    <td className="py-3 pr-4">
-                      {m.status === 'delivered' ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><CheckCircle2 className="h-3 w-3" /> Delivered</span>
-                      ) : m.status === 'failed' ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-red-500"><XCircle className="h-3 w-3" /> Failed</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-yellow-600"><AlertCircle className="h-3 w-3" /> Partial</span>
-                      )}
-                    </td>
-                    <td className="py-3 text-muted-foreground text-xs">{m.sentAt}</td>
+          {loading ? (
+            <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <AlertCircle className="h-8 w-8 text-red-500" />
+              <p className="text-sm text-muted-foreground">{error}</p>
+              <button onClick={fetchData} className="text-sm text-primary hover:underline">Retry</button>
+            </div>
+          ) : data.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No SMS messages sent yet.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="text-left font-medium text-muted-foreground pb-3 pr-4">Message</th>
+                    <th className="text-left font-medium text-muted-foreground pb-3 pr-4">Title</th>
+                    <th className="text-left font-medium text-muted-foreground pb-3">Sent At</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {data.map((m) => (
+                    <tr key={m.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0">
+                      <td className="py-3 pr-4 max-w-sm truncate font-medium">{m.message || m.title}</td>
+                      <td className="py-3 pr-4 text-muted-foreground text-xs">{m.title}</td>
+                      <td className="py-3 text-muted-foreground text-xs">{new Date(m.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

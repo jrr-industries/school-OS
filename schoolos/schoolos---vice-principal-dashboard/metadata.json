@@ -1,0 +1,6 @@
+{
+  "name": "SchoolOS - Vice Principal Dashboard",
+  "description": "Enterprise operational command center dashboard for daily school operations management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

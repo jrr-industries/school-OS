@@ -39,6 +39,7 @@ export default function CreateSchoolPage() {
     phone: '',
     adminName: '',
     adminEmail: '',
+    adminPassword: '',
     requireVerification: false,
     planId: '',
   });
@@ -164,7 +165,7 @@ export default function CreateSchoolPage() {
             View All Schools
           </button>
           <button
-            onClick={() => { setResult(null); setForm({ name: '', slug: '', type: 'primary', address: '', email: '', phone: '', adminName: '', adminEmail: '', requireVerification: false, planId: plans[0]?.id || '' }); }}
+            onClick={() => { setResult(null); setForm({ name: '', slug: '', type: 'primary', address: '', email: '', phone: '', adminName: '', adminEmail: '', adminPassword: '', requireVerification: false, planId: plans[0]?.id || '' }); }}
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
           >
             Create Another
@@ -354,7 +355,7 @@ export default function CreateSchoolPage() {
               <p className="text-xs text-muted-foreground mt-0.5">This person will manage the school on the platform</p>
             </div>
             <div className="p-6 space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Admin Full Name *</label>
                   <input
@@ -377,12 +378,17 @@ export default function CreateSchoolPage() {
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                 </div>
-              </div>
-              <div className="rounded-md bg-muted/50 p-3">
-                <p className="text-xs text-muted-foreground">
-                  The admin will receive a default password: <code className="font-mono font-medium text-foreground">Admin@123</code>.
-                  They can change it after first login. This is a development-only behavior.
-                </p>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Admin Password *</label>
+                  <input
+                    type="text"
+                    placeholder="Set a password"
+                    value={form.adminPassword}
+                    onChange={(e) => handleChange('adminPassword', e.target.value)}
+                    required
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </div>
               </div>
             </div>
           </div>

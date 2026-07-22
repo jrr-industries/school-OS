@@ -1,0 +1,6 @@
+{
+  "name": "Today's Cafeteria Menu",
+  "description": "SchoolOS Student & Parent Dashboard - Read-Only Today's Cafeteria Menu Widget with live kitchen metrics and dark glassmorphic design.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

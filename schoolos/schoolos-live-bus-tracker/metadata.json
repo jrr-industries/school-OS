@@ -1,0 +1,6 @@
+{
+  "name": "SchoolOS Live Bus Tracker",
+  "description": "SchoolOS Student and Parent Dashboard widget for real-time school bus live location tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

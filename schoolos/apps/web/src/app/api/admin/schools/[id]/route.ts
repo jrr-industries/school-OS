@@ -146,3 +146,39 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json(
+      { success: false, error: 'Only available in development mode' },
+      { status: 403 },
+    );
+  }
+
+  try {
+    const session = await getDevSession();
+    if (!session || session.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    const existing = await prisma.school.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ success: false, error: 'School not found' }, { status: 404 });
+    }
+
+    await prisma.school.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    return NextResponse.json({ success: true, data: null });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete school';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
+  }
+}

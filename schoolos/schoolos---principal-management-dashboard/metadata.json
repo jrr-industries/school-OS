@@ -1,0 +1,6 @@
+{
+  "name": "SchoolOS - Principal Management Dashboard",
+  "description": "SchoolOS Principal Executive Dashboard for Green Valley International School with live student/teacher metrics, bus fleet tracking, pending approvals, financial KPIs, academic performance analytics, and AI assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

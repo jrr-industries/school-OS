@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, slug, type, address, email, phone, adminName, adminEmail, requireVerification, planId } = body;
+    const { name, slug, type, address, email, phone, adminName, adminEmail, adminPassword, requireVerification, planId } = body;
 
     if (!name || !slug || !type || !adminName || !adminEmail) {
       return NextResponse.json(
@@ -227,7 +227,7 @@ export async function POST(request: Request) {
         },
         credentials: {
           email: adminUser.email,
-          password: 'Admin@123',
+          password: adminPassword || 'Admin@123',
         },
         plan: {
           id: plan.id,

@@ -101,16 +101,32 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { schoolId, userId, type, category, title, message, link, metadata } = body;
 
-    if (!schoolId || !title) {
+    if (!title) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: schoolId, title' },
+        { success: false, error: 'Missing required field: title' },
         { status: 400 },
       );
     }
 
+    let targetSchoolId = schoolId;
+    if (!targetSchoolId) {
+      const firstSchool = await prisma.school.findFirst({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      targetSchoolId = firstSchool?.id;
+      if (!targetSchoolId) {
+        return NextResponse.json(
+          { success: false, error: 'No schools available' },
+          { status: 400 },
+        );
+      }
+    }
+
     const notification = await prisma.notification.create({
       data: {
-        schoolId,
+        schoolId: targetSchoolId,
         userId: userId ?? null,
         type: type ?? 'info',
         category: category ?? 'system',
@@ -125,6 +141,48 @@ export async function POST(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Failed to create notification';
+    return NextResponse.json(
+      { success: false, error: message },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json(
+      { success: false, error: 'Only available in development mode' },
+      { status: 403 },
+    );
+  }
+
+  try {
+    const session = await getDevSession();
+    if (!session || session.role !== 'SUPER_ADMIN') {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 },
+      );
+    }
+
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required query param: id' },
+        { status: 400 },
+      );
+    }
+
+    await prisma.notification.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    return NextResponse.json({ success: true, data: null });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to delete notification';
     return NextResponse.json(
       { success: false, error: message },
       { status: 500 },

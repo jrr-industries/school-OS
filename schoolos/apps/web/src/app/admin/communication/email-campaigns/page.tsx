@@ -1,49 +1,70 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@schoolos/ui';
-import { Mail, Plus, Send, Clock, CheckCircle2, AlertCircle, Eye, MousePointerClick } from 'lucide-react';
+import { Mail, Plus, Loader2, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 
-interface Campaign {
+interface CampaignItem {
   id: string;
-  name: string;
-  status: 'draft' | 'scheduled' | 'sending' | 'sent';
-  recipients: number;
-  sent: number;
-  opened: number;
-  clicked: number;
-  date: string;
+  title: string;
+  message: string | null;
+  createdAt: string;
+  metadata: Record<string, unknown> | null;
 }
 
-const campaigns: Campaign[] = [
-  { id: '1', name: 'Back to School Newsletter', status: 'sent', recipients: 15200, sent: 14890, opened: 8940, clicked: 3120, date: '2026-07-15' },
-  { id: '2', name: 'New Feature Announcement', status: 'sending', recipients: 18400, sent: 7200, opened: 4100, clicked: 1800, date: '2026-07-18' },
-  { id: '3', name: 'Professional Development Offer', status: 'draft', recipients: 5600, sent: 0, opened: 0, clicked: 0, date: '2026-07-20' },
-  { id: '4', name: 'End of Year Reminders', status: 'scheduled', recipients: 22000, sent: 0, opened: 0, clicked: 0, date: '2026-07-28' },
-  { id: '5', name: 'Parent-Teacher Conference Invite', status: 'sent', recipients: 9800, sent: 9650, opened: 7230, clicked: 4100, date: '2026-07-10' },
-  { id: '6', name: 'Summer Camp Registration', status: 'sent', recipients: 12500, sent: 12100, opened: 8100, clicked: 5200, date: '2026-07-05' },
-  { id: '7', name: 'Security Awareness Training', status: 'draft', recipients: 3500, sent: 0, opened: 0, clicked: 0, date: '2026-07-22' },
-];
-
-const statusBadge = (status: Campaign['status']) => {
-  const styles: Record<string, string> = {
-    draft: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200',
-    scheduled: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    sending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-    sent: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  };
-  return styles[status];
-};
-
-const statusIcon = (status: Campaign['status']) => {
-  switch (status) {
-    case 'draft': return <AlertCircle className="h-3 w-3" />;
-    case 'scheduled': return <Clock className="h-3 w-3" />;
-    case 'sending': return <Send className="h-3 w-3" />;
-    case 'sent': return <CheckCircle2 className="h-3 w-3" />;
-  }
-};
-
 export default function EmailCampaignsPage() {
+  const [data, setData] = useState<CampaignItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [formTitle, setFormTitle] = useState('');
+  const [formMessage, setFormMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/notifications?type=info&category=communication&limit=50');
+      const json = await res.json();
+      if (json.success) setData(json.data);
+      else setError(json.error || 'Failed to load');
+    } catch {
+      setError('Failed to fetch campaigns');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleCreate = async () => {
+    if (!formTitle.trim()) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/admin/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: formTitle,
+          message: formMessage,
+          type: 'info',
+          category: 'communication',
+          metadata: { channel: 'email' },
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setShowModal(false);
+        setFormTitle('');
+        setFormMessage('');
+        fetchData();
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -51,11 +72,34 @@ export default function EmailCampaignsPage() {
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Email Campaigns</h1>
           <p className="text-sm text-muted-foreground mt-1">Create and manage email marketing campaigns</p>
         </div>
-        <button className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors gap-2">
+        <button onClick={() => setShowModal(true)} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors gap-2">
           <Plus className="h-4 w-4" />
           New Campaign
         </button>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowModal(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold">New Campaign</h2>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Campaign Name</label>
+              <input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="Campaign name" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Content</label>
+              <textarea value={formMessage} onChange={(e) => setFormMessage(e.target.value)} rows={4} placeholder="Email content..." className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setShowModal(false)} className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
+              <button onClick={handleCreate} disabled={submitting || !formTitle.trim()} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors gap-2 disabled:opacity-50">
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -65,49 +109,42 @@ export default function EmailCampaignsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left font-medium text-muted-foreground pb-3 pr-4">Campaign</th>
-                  <th className="text-left font-medium text-muted-foreground pb-3 pr-4">Status</th>
-                  <th className="text-right font-medium text-muted-foreground pb-3 pr-4">Recipients</th>
-                  <th className="text-right font-medium text-muted-foreground pb-3 pr-4">Sent</th>
-                  <th className="text-right font-medium text-muted-foreground pb-3 pr-4">Opened</th>
-                  <th className="text-right font-medium text-muted-foreground pb-3 pr-4">Clicked</th>
-                  <th className="text-left font-medium text-muted-foreground pb-3">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {campaigns.map((c) => (
-                  <tr key={c.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0">
-                    <td className="py-3 pr-4 font-medium">{c.name}</td>
-                    <td className="py-3 pr-4">
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge(c.status)}`}>
-                        {statusIcon(c.status)}
-                        {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4 text-right">{c.recipients.toLocaleString()}</td>
-                    <td className="py-3 pr-4 text-right text-muted-foreground">{c.sent.toLocaleString()}</td>
-                    <td className="py-3 pr-4 text-right">
-                      <span className="inline-flex items-center gap-1">
-                        <Eye className="h-3 w-3 text-muted-foreground" />
-                        {c.opened.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4 text-right">
-                      <span className="inline-flex items-center gap-1">
-                        <MousePointerClick className="h-3 w-3 text-muted-foreground" />
-                        {c.clicked.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="py-3 text-muted-foreground">{c.date}</td>
+          {loading ? (
+            <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <AlertCircle className="h-8 w-8 text-red-500" />
+              <p className="text-sm text-muted-foreground">{error}</p>
+              <button onClick={fetchData} className="text-sm text-primary hover:underline">Retry</button>
+            </div>
+          ) : data.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Mail className="h-10 w-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No email campaigns yet.</p>
+              <button onClick={() => setShowModal(true)} className="mt-3 text-sm text-primary hover:underline">Create one</button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="text-left font-medium text-muted-foreground pb-3 pr-4">Campaign</th>
+                    <th className="text-left font-medium text-muted-foreground pb-3 pr-4">Content</th>
+                    <th className="text-left font-medium text-muted-foreground pb-3">Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {data.map((c) => (
+                    <tr key={c.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0">
+                      <td className="py-3 pr-4 font-medium">{c.title}</td>
+                      <td className="py-3 pr-4 text-muted-foreground max-w-xs truncate">{c.message || '-'}</td>
+                      <td className="py-3 text-muted-foreground">{new Date(c.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

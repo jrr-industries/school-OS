@@ -442,38 +442,58 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Main content */}
+        {/* Main content */}
       <div className="flex flex-1 flex-col lg:pl-64">
         {/* Top bar */}
-        <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 px-4 lg:px-6 dark:border-slate-800 dark:bg-slate-900/95">
+        <header className="sticky top-0 z-40 flex h-16 items-center gap-2 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 lg:px-6 shadow-sm">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden text-muted-foreground hover:text-foreground"
+            className="lg:hidden rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label="Open sidebar"
           >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
 
-          {/* Breadcrumb will be rendered by page */}
+          {/* Breadcrumb */}
+          <nav className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">SchoolOS</span>
+            <ChevronRight className="h-3.5 w-3.5" />
+            {(() => {
+              const segments = pathname?.split('/').filter(Boolean) ?? [];
+              if (segments.length <= 2) return <span className="text-foreground font-medium">Admin</span>;
+              const last = segments[segments.length - 1];
+              return <span className="text-foreground font-medium capitalize">{last.replace(/-/g, ' ')}</span>;
+            })()}
+          </nav>
 
           <div className="flex-1" />
+
+          {/* Quick actions */}
+          <div className="hidden md:flex items-center gap-1">
+            <button
+              onClick={() => window.open('/admin/schools/create', '_self')}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              + New School
+            </button>
+          </div>
 
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
-            className="rounded-full p-2 text-muted-foreground hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             title={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
             aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
           >
-            {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
 
           {/* User info */}
-          <div className="flex items-center gap-3 border-l border-slate-200 pl-4 dark:border-slate-800">
-            <Avatar size="sm" fallback="SA" />
-            <div className="hidden sm:block">
-              <p className="text-sm font-medium">Super Admin</p>
-              <p className="text-xs text-muted-foreground">admin@schoolos.dev</p>
+          <div className="flex items-center gap-2.5 border-l border-border pl-3">
+            <Avatar size="sm" fallback="SA" className="ring-2 ring-primary/20" />
+            <div className="hidden lg:block">
+              <p className="text-sm font-medium text-foreground leading-tight">Super Admin</p>
+              <p className="text-xs text-muted-foreground leading-tight">admin@schoolos.dev</p>
             </div>
           </div>
         </header>
