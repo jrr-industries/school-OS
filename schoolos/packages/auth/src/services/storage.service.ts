@@ -59,11 +59,6 @@ function validateFile(file: File): void {
   }
 }
 
-function getFileExtension(filename: string): string {
-  const ext = filename.split('.').pop();
-  return ext ? `.${ext}` : '';
-}
-
 function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
@@ -77,7 +72,6 @@ export class StorageService {
     validateFile(file);
 
     const supabase = createSupabaseAdminClient();
-    const ext = getFileExtension(file.name);
     const sanitized = sanitizeFileName(file.name);
     const timestamp = Date.now();
     const uniquePath = `${schoolId}/${userId}/${timestamp}_${sanitized}`;

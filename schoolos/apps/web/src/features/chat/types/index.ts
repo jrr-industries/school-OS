@@ -149,6 +149,17 @@ export interface TypingUser {
   timestamp: number;
 }
 
+export interface ChatUser {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string | null;
+  isSuperAdmin?: boolean;
+  schoolId?: string;
+  school?: { name: string; slug: string };
+  userRoles?: { role: { slug: string } }[];
+}
+
 export interface PresenceState {
   onlineUsers: Record<string, boolean>;
   lastSeen: Record<string, string>;

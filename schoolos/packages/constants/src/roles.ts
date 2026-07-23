@@ -27,6 +27,7 @@ export const ROLE_HIERARCHY: Record<RoleSlug, number> = {
   hr: 60,
   accountant: 60,
   teacher: 50,
+  driver: 45,
   transport_manager: 45,
   librarian: 40,
   receptionist: 35,

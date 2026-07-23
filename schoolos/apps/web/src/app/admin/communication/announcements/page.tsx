@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useAnnouncementsRealtime } from '@/features/chat/hooks/use-chat-realtime';
@@ -42,13 +42,9 @@ export default function AnnouncementsPage() {
     },
   });
 
-  const handleCreate = useCallback(async (payload: CreateAnnouncementPayload) => {
+  const handleCreate = async (payload: CreateAnnouncementPayload) => {
     await createMutation.mutateAsync(payload);
-  }, [createMutation]);
-
-  const handleRetry = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['announcements'] });
-  }, [queryClient]);
+  };
 
   return (
     <div className="space-y-6">
@@ -70,9 +66,8 @@ export default function AnnouncementsPage() {
 
       <AnnouncementList
         announcements={announcements ?? []}
-        loading={isLoading}
-        error={error instanceof Error ? error.message : null}
-        onRetry={handleRetry}
+        isLoading={isLoading}
+        error={error instanceof Error ? error : null}
       />
 
       {showForm && (

@@ -29,9 +29,12 @@ interface Conversation {
 }
 
 async function fetchToken() {
-  const res = await fetch('/api/school-admin/chat/socket-token');
-  const json = await res.json();
-  if (json.success) return json.data as { token: string; userId: string; name: string; email: string; role: string };
+  try {
+    const res = await fetch('/api/school-admin/chat/socket-token');
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.success) return json.data as { token: string; userId: string; name: string; email: string; role: string };
+  } catch { /* ignore */ }
   return null;
 }
 
@@ -119,9 +122,12 @@ export default function SchoolAdminChatPage() {
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
   const fetchMessages = useCallback(async (convId: string) => {
-    const res = await fetch(`/api/school-admin/chat/messages?conversationId=${convId}`);
-    const json = await res.json();
-    if (json.success) setMessages(json.data);
+    try {
+      const res = await fetch(`/api/school-admin/chat/messages?conversationId=${convId}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.success) setMessages(json.data);
+    } catch { /* ignore */ }
   }, []);
 
   const openConversation = useCallback(async (convId: string) => {
@@ -160,21 +166,24 @@ export default function SchoolAdminChatPage() {
   const partner = activeConv ? convPartner(activeConv) : undefined;
 
   const startConversation = async (targetId: string) => {
-    const res = await fetch('/api/school-admin/chat/conversations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ participantId: targetId }),
-    });
-    const json = await res.json();
-    if (json.success) {
-      setConversations((prev) => {
-        const idx = prev.findIndex((c) => c.id === json.data.id);
-        if (idx >= 0) { const u = [...prev]; u[idx] = json.data; return u; }
-        return [json.data, ...prev];
+    try {
+      const res = await fetch('/api/school-admin/chat/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participantId: targetId }),
       });
-      setShowNewChat(false);
-      openConversation(json.data.id);
-    } else toast.error(json.error || 'Failed to create conversation');
+      if (!res.ok) { toast.error(`Request failed (${res.status})`); return; }
+      const json = await res.json();
+      if (json.success) {
+        setConversations((prev) => {
+          const idx = prev.findIndex((c) => c.id === json.data.id);
+          if (idx >= 0) { const u = [...prev]; u[idx] = json.data; return u; }
+          return [json.data, ...prev];
+        });
+        setShowNewChat(false);
+        openConversation(json.data.id);
+      } else toast.error(json.error || 'Failed to create conversation');
+    } catch { toast.error('Failed to create conversation'); }
   };
 
   const sendText = async (content: string) => {

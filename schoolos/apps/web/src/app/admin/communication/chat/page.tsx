@@ -1,157 +1,421 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Megaphone, Search, Menu } from 'lucide-react';
-import { useConversations, useMessages, useSendMessage, useCreateConversation, useMarkAsRead, useReactToMessage, useEditMessage, useDeleteMessage, useTogglePin, useToggleArchive, useToggleMute, useSearchConversations, useSearchMessages, useCreateAnnouncement, useGetAnnouncements, useMarkAnnouncementRead, useClearConversation, useDeleteConversation } from '@/features/chat/hooks/use-chat-queries';
-import { useConversationRealtime, usePresence, useTypingBroadcast, useAnnouncementRealtime } from '@/features/chat/hooks/use-chat-realtime';
-import { ConversationSidebar } from '@/features/chat/components/conversation-sidebar';
-import { ChatWindow } from '@/features/chat/components/chat-window';
-import { AnnouncementList } from '@/features/chat/components/announcement-list';
-import { AnnouncementForm } from '@/features/chat/components/announcement-form';
-import { SearchDialog } from '@/features/chat/components/search-dialog';
-import type { Conversation, ChatMessage, ChatUser } from '@/features/chat/types';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Search, MessageSquare, School, Loader2, CheckCheck } from 'lucide-react';
+import { cn } from '@schoolos/ui';
+import { ChatHeader } from '@/features/chat/components/chat-header';
+import { ChatInput } from '@/features/chat/components/chat-input';
+import { MessageBubble, DateSeparator } from '@/features/chat/components/message-bubble';
+import { TypingIndicator } from '@/features/chat/components/typing-indicator';
+import {
+  useMessages,
+  useSendMessage,
+  useMarkAsRead,
+  useReactToMessage,
+  useDeleteMessage,
+} from '@/features/chat/hooks/use-chat-queries';
+import { useConversationRealtime, usePresence, useTypingBroadcast, startTyping } from '@/features/chat/hooks/use-chat-realtime';
+import { useChatStore } from '@/features/chat/store/chat-store';
+import { createClientSupabaseClient } from '@schoolos/auth/client';
+import { toast } from 'sonner';
+import type { ChatMessage, Conversation } from '@/features/chat/types';
 
-export default function ChatPage() {
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
-  const [showAnnouncements, setShowAnnouncements] = useState(false);
-  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
-  const [availableUsers, setAvailableUsers] = useState<ChatUser[]>([]);
+interface SchoolAdmin {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  schoolId: string;
+  school: { id: string; name: string; slug: string; logo: string | null };
+  conversationId: string | null;
+  lastMessage: { id: string; content: string; messageType: string; createdAt: string; senderId: string } | null;
+  unreadCount: number;
+}
 
-  const { data: conversations = [], isLoading: convLoading } = useConversations();
-  const { data: messagesPages, fetchNextPage, hasNextPage, isLoading: msgsLoading } = useMessages(activeConversationId);
+function formatTime(iso: string) {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'now';
+  if (diffMins < 60) return `${diffMins}m`;
+  if (diffMins < 1440) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString();
+}
+
+export default function CommunicationChatPage() {
+  const [schoolAdmins, setSchoolAdmins] = useState<SchoolAdmin[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>();
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [activeAdmin, setActiveAdmin] = useState<SchoolAdmin | null>(null);
+
+  const { data: messagesPages, fetchNextPage, hasNextPage, isLoading: msgsLoading } = useMessages(activeConvId);
   const sendMessage = useSendMessage();
-  const createConversation = useCreateConversation();
   const markAsRead = useMarkAsRead();
   const reactToMessage = useReactToMessage();
-  const editMessage = useEditMessage();
   const deleteMessage = useDeleteMessage();
-  const togglePin = useTogglePin();
-  const toggleArchive = useToggleArchive();
-  const toggleMute = useToggleMute();
-  const searchConversations = useSearchConversations();
-  const searchMessages = useSearchMessages();
-  const createAnnouncement = useCreateAnnouncement();
-  const { data: announcements = [], isLoading: annLoading } = useGetAnnouncements();
-  const markAnnouncementRead = useMarkAnnouncementRead();
-  const clearConversation = useClearConversation();
-  const deleteConversation = useDeleteConversation();
+  const onlineUsers = useChatStore((s) => s.onlineUsers);
+  const typingUsers = useChatStore((s) => s.typingUsers);
 
-  useConversationRealtime(activeConversationId);
-  usePresence(activeConversationId, currentUserId);
-  useTypingBroadcast(activeConversationId, currentUserId);
-  useAnnouncementRealtime();
+  useConversationRealtime(activeConvId);
+  usePresence(activeConvId, currentUserId);
+  useTypingBroadcast(activeConvId, currentUserId);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await fetch('/api/auth/session');
-        const json = await res.json();
-        if (json.success && json.data) setCurrentUserId(json.data.id);
-      } catch {}
-    };
-    fetchUser();
+  const fetchSchoolAdmins = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/chat/school-admins');
+      const json = await res.json();
+      if (json.success) { setSchoolAdmins(json.data); }
+      else { toast.error(json.error ?? 'Failed to load school admins'); }
+    } catch { toast.error('Failed to load school admins'); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
-    if (activeConversationId) markAsRead.mutate(activeConversationId);
-  }, [activeConversationId]);
+    (async () => {
+      try {
+        const meRes = await fetch('/api/admin/chat?type=me');
+        const meJson = await meRes.json();
+        if (meJson.success) setCurrentUserId(meJson.data.id);
+      } catch {}
+    })();
+    fetchSchoolAdmins();
+  }, [fetchSchoolAdmins]);
+
+  useEffect(() => {
+    if (!activeConvId) return;
+    const supabase = createClientSupabaseClient();
+    if (!supabase) return;
+    const channel = supabase.channel(`admin-sidebar-${activeConvId}`);
+    channel
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'chat_messages',
+        filter: `conversation_id=eq.${activeConvId}`,
+      }, () => { fetchSchoolAdmins(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [activeConvId, fetchSchoolAdmins]);
+
+  useEffect(() => {
+    if (activeConvId) {
+      markAsRead.mutate(activeConvId);
+      setSchoolAdmins((prev) =>
+        prev.map((a) => (a.conversationId === activeConvId ? { ...a, unreadCount: 0 } : a))
+      );
+    }
+  }, [activeConvId]);
+
+  const filteredAdmins = useMemo(() => {
+    if (!search.trim()) return schoolAdmins;
+    const q = search.toLowerCase();
+    return schoolAdmins.filter(
+      (a) => a.school.name.toLowerCase().includes(q) || a.name.toLowerCase().includes(q),
+    );
+  }, [schoolAdmins, search]);
+
+  const handleSelect = useCallback(async (admin: SchoolAdmin) => {
+    try {
+      let convId = admin.conversationId;
+
+      if (!convId) {
+        const res = await fetch('/api/admin/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'create-conversation', participantId: admin.id }),
+        });
+        const json = await res.json();
+        if (!json.success) { toast.error(json.error ?? 'Failed to create conversation'); return; }
+        convId = json.data.id;
+        setSchoolAdmins((prev) =>
+          prev.map((a) => (a.id === admin.id ? { ...a, conversationId: convId } : a))
+        );
+      }
+
+      setActiveAdmin(admin);
+      setActiveConvId(convId);
+    } catch { toast.error('Failed to open conversation'); }
+  }, []);
+
+  const handleSendMessage = useCallback((content: string, opts?: { replyToId?: string; fileUrl?: string; fileName?: string; fileSize?: number; fileId?: string; messageType?: string }) => {
+    if (!activeConvId) return;
+    sendMessage.mutate({
+      conversationId: activeConvId,
+      content,
+      replyToId: opts?.replyToId,
+      fileUrl: opts?.fileUrl,
+      fileName: opts?.fileName,
+      fileSize: opts?.fileSize,
+      fileId: opts?.fileId,
+      messageType: opts?.messageType as any,
+    }, {
+      onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to send message'),
+    });
+  }, [activeConvId, sendMessage]);
 
   const messages: ChatMessage[] = messagesPages?.pages.flatMap((p) => p.messages) ?? [];
-  const activeConversation = conversations.find((c) => c.id === activeConversationId);
 
-  const handleSendMessage = useCallback((content: string, opts?: any) => {
-    if (!activeConversationId) return;
-    sendMessage.mutate({ conversationId: activeConversationId, content, ...opts } as any);
-  }, [activeConversationId, sendMessage]);
+  const conversation = useMemo((): Conversation | null => {
+    if (!activeAdmin || !activeConvId) return null;
+    return {
+      id: activeConvId,
+      schoolId: activeAdmin.schoolId,
+      title: activeAdmin.name,
+      isGroup: false,
+      isPinned: false,
+      isArchived: false,
+      isMuted: false,
+      lastMessageAt: activeAdmin.lastMessage?.createdAt ?? null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      participants: [{
+        id: activeAdmin.id,
+        userId: activeAdmin.id,
+        role: 'member',
+        isMuted: false,
+        notificationsEnabled: true,
+        lastReadAt: null,
+        joinedAt: new Date().toISOString(),
+        leftAt: null,
+        user: {
+          id: activeAdmin.id,
+          name: activeAdmin.name,
+          email: activeAdmin.email,
+          avatar: activeAdmin.avatar,
+          isSuperAdmin: false,
+        },
+      }],
+      messages: [],
+      unreadCount: 0,
+    };
+  }, [activeAdmin, activeConvId]);
 
-  const handleLoadUsers = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/chat?type=users');
-      const json = await res.json();
-      if (json.success) setAvailableUsers(json.data);
-    } catch {}
-  }, []);
+  const otherParticipant = conversation?.participants[0] ?? null;
+  const isOnline = activeAdmin ? !!onlineUsers[activeAdmin.id] : false;
 
-  if (convLoading && !activeConversationId) {
-    return (
-      <div className="flex items-center justify-center min-h-[600px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const typingNames = activeConvId
+    ? (typingUsers[activeConvId] ?? []).filter((t) => t.userId !== currentUserId).map((t) => t.userName)
+    : [];
 
   return (
-    <div className="h-[calc(100vh-9rem)] flex rounded-xl border bg-background overflow-hidden shadow-sm">
-      <div className="w-80 xl:w-96 flex flex-col border-r bg-card">
-        <div className="flex items-center justify-between p-3 border-b">
-          <h1 className="font-semibold text-sm">Messages</h1>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setShowSearch(true)} className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors" title="Search">
-              <Search className="h-4 w-4" />
-            </button>
-            <button onClick={() => { setShowAnnouncements(!showAnnouncements); setActiveConversationId(null); }}
-              className={`p-2 rounded-lg transition-colors ${showAnnouncements ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`} title="Announcements">
-              <Megaphone className="h-4 w-4" />
-            </button>
+    <div className="h-[calc(100vh-7rem)] flex rounded-xl border bg-background overflow-hidden shadow-sm">
+      {/* Left Sidebar */}
+      <div className="flex w-80 xl:w-96 flex-col border-r bg-card shrink-0">
+        <div className="p-4 border-b">
+          <h1 className="text-lg font-semibold tracking-tight">School Admins</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {schoolAdmins.length} {schoolAdmins.length === 1 ? 'admin' : 'admins'}
+          </p>
+          <div className="relative mt-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by school or admin name..."
+              className="w-full h-9 pl-9 pr-3 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
           </div>
         </div>
 
-        {showAnnouncements ? (
-          <div className="flex-1 overflow-y-auto p-3">
-            <AnnouncementList announcements={announcements} isLoading={annLoading}
-              onMarkRead={(id) => markAnnouncementRead.mutate(id)} onCreate={() => setShowAnnouncementForm(true)} canCreate={false} />
-          </div>
-        ) : (
-          <ConversationSidebar conversations={conversations} activeId={activeConversationId}
-            onSelect={(id) => { setActiveConversationId(id); setShowAnnouncements(false); }}
-            onNewChat={handleLoadUsers} availableUsers={availableUsers} currentUserId={currentUserId} isLoading={convLoading} />
-        )}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredAdmins.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+              <School className="h-10 w-10 text-muted-foreground/40 mb-3" />
+              <p className="text-sm font-medium text-muted-foreground">
+                {search ? 'No admins match your search' : 'No school admins found'}
+              </p>
+            </div>
+          ) : (
+            filteredAdmins.map((admin) => (
+              <button
+                key={admin.id}
+                onClick={() => handleSelect(admin)}
+                className={cn(
+                  'w-full flex items-start gap-3 p-3 text-left transition-colors border-b border-border/50 last:border-0 hover:bg-muted/50',
+                  activeConvId === admin.conversationId && 'bg-primary/5 hover:bg-primary/5',
+                )}
+              >
+                <div className="h-10 w-10 rounded-lg overflow-hidden bg-primary/10 flex items-center justify-center shrink-0 relative">
+                  {admin.school.logo ? (
+                    <img src={admin.school.logo} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-bold text-primary">{admin.school.name.charAt(0)}</span>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium truncate">{admin.school.name}</p>
+                    {admin.lastMessage && (
+                      <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
+                        {formatTime(admin.lastMessage.createdAt)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className={cn(
+                      'h-2 w-2 rounded-full shrink-0',
+                      onlineUsers[admin.id] ? 'bg-green-500' : 'bg-gray-300',
+                    )} />
+                    <p className="text-xs text-muted-foreground truncate">{admin.name}</p>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <p className="text-xs text-muted-foreground truncate">
+                      {admin.lastMessage ? (
+                        <>
+                          {admin.lastMessage.senderId === currentUserId && (
+                            <CheckCheck className="h-3 w-3 inline mr-0.5 text-blue-400" />
+                          )}
+                          {admin.lastMessage.messageType === 'image' ? '📷 Photo'
+                            : admin.lastMessage.messageType === 'voice' ? '🎤 Voice'
+                            : admin.lastMessage.messageType === 'document' ? '📎 File'
+                            : admin.lastMessage.content}
+                        </>
+                      ) : (
+                        <span className="italic">No messages yet</span>
+                      )}
+                    </p>
+                    {admin.unreadCount > 0 && (
+                      <span className="h-5 min-w-[20px] rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center px-1.5 shrink-0">
+                        {admin.unreadCount > 99 ? '99+' : admin.unreadCount}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
       </div>
 
-      {activeConversation ? (
-        <ChatWindow conversation={activeConversation} currentUserId={currentUserId}
-          onBack={() => setActiveConversationId(null)}
-          onSendMessage={handleSendMessage}
-          onReact={(messageId, emoji) => reactToMessage.mutate({ messageId, emoji })}
-          onEdit={(messageId, content) => editMessage.mutate({ messageId, content })}
-          onDelete={(messageId) => deleteMessage.mutate({ messageId })}
-          onCopy={(content) => navigator.clipboard.writeText(content)}
-          onTogglePin={() => activeConversationId && togglePin.mutate(activeConversationId)}
-          onToggleArchive={() => activeConversationId && toggleArchive.mutate(activeConversationId)}
-          onToggleMute={() => activeConversationId && toggleMute.mutate(activeConversationId)}
-          onClearChat={() => activeConversationId && clearConversation.mutate(activeConversationId)}
-          onDeleteChat={() => activeConversationId && deleteConversation.mutate(activeConversationId)}
-          onLoadMore={() => hasNextPage && fetchNextPage()} hasMore={hasNextPage}
-          isLoading={msgsLoading} messages={messages}
-        />
-      ) : (
-        <div className="flex-1 hidden lg:flex items-center justify-center bg-muted/30">
-          <div className="text-center p-8">
-            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl font-bold text-primary">S</span>
+      {/* Right Chat Panel */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {conversation && activeAdmin ? (
+          <>
+            <ChatHeader
+              participant={otherParticipant}
+              isOnline={isOnline}
+              onBack={() => { setActiveConvId(null); setActiveAdmin(null); }}
+            />
+
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 bg-muted/30 relative">
+              {msgsLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <MessageSquare className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-medium">{activeAdmin.school.name}</h3>
+                  <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+                    Chat with {activeAdmin.name}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {hasNextPage && (
+                    <div className="flex justify-center py-2">
+                      <button onClick={() => fetchNextPage()} className="text-xs text-primary hover:underline">
+                        Load older messages
+                      </button>
+                    </div>
+                  )}
+                  {messages.map((msg, idx) => {
+                    const isMine = msg.senderId === currentUserId;
+                    const showAvatar = idx === 0 || messages[idx - 1]?.senderId !== msg.senderId;
+                    const showDateSep = idx === 0 || new Date(msg.createdAt).toDateString() !== new Date(messages[idx - 1].createdAt).toDateString();
+                    return (
+                      <div key={msg.id}>
+                        {showDateSep && <DateSeparator date={msg.createdAt} />}
+                        <MessageBubble
+                          message={msg}
+                          isMine={isMine}
+                          showAvatar={showAvatar}
+                          onReply={() => {}}
+                          onDelete={(id: string) => deleteMessage.mutate({ messageId: id, forEveryone: true })}
+                          onReact={(messageId: string, emoji: string) => reactToMessage.mutate({ messageId, emoji })}
+                          onCopy={(content: string) => navigator.clipboard.writeText(content)}
+                        />
+                      </div>
+                    );
+                  })}
+                  <TypingIndicator names={typingNames} />
+                </>
+              )}
             </div>
-            <h3 className="text-lg font-medium">SchoolOS Chat</h3>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-              Select a conversation from the sidebar or start a new chat to begin messaging
-            </p>
+
+            <ChatInput
+              onSend={(content: string) => handleSendMessage(content)}
+              onSendFile={async (file: File) => {
+                try {
+                  const fd = new FormData();
+                  fd.append('file', file);
+                  const res = await fetch('/api/upload', { method: 'POST', body: fd });
+                  const json = await res.json();
+                  if (json.success) {
+                    handleSendMessage('', {
+                      fileUrl: json.data.url,
+                      fileName: json.data.name,
+                      fileSize: json.data.size,
+                      fileId: json.data.fileRecordId,
+                      messageType: json.data.messageType,
+                    });
+                  } else {
+                    toast.error(json.error ?? 'Upload failed');
+                  }
+                } catch { toast.error('Upload failed'); }
+              }}
+              onSendVoice={async (blob: Blob, _duration?: number) => {
+                try {
+                  const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
+                  const fd = new FormData();
+                  fd.append('file', file);
+                  const res = await fetch('/api/upload', { method: 'POST', body: fd });
+                  const json = await res.json();
+                  if (json.success) {
+                    handleSendMessage('', {
+                      fileUrl: json.data.url,
+                      fileName: json.data.name,
+                      fileSize: json.data.size,
+                      fileId: json.data.fileRecordId,
+                      messageType: 'voice',
+                    });
+                  } else {
+                    toast.error(json.error ?? 'Voice upload failed');
+                  }
+                } catch { toast.error('Voice upload failed'); }
+              }}
+              onTyping={() => {
+                if (activeConvId && currentUserId) {
+                  startTyping(activeConvId, currentUserId, 'Super Admin');
+                }
+              }}
+              disabled={!activeConvId}
+              placeholder="Type a message..."
+            />
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center bg-muted/30">
+            <div className="text-center max-w-sm px-8">
+              <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="h-10 w-10 text-primary" />
+              </div>
+              <h2 className="text-xl font-semibold">SchoolOS Chat</h2>
+              <p className="text-sm text-muted-foreground mt-2">
+                Select a school admin from the sidebar to start a conversation
+              </p>
+            </div>
           </div>
-        </div>
-      )}
-
-      {showAnnouncementForm && (
-        <AnnouncementForm onSubmit={(payload) => { createAnnouncement.mutate(payload, { onSuccess: () => setShowAnnouncementForm(false) }); }}
-          onClose={() => setShowAnnouncementForm(false)} isSubmitting={createAnnouncement.isPending} />
-      )}
-
-      {showSearch && (
-        <SearchDialog onClose={() => setShowSearch(false)}
-          onSearchConversations={async (q) => { const r = await searchConversations.mutateAsync(q); return r.data ?? []; }}
-          onSearchMessages={async (q, convId) => { const r = await searchMessages.mutateAsync({ query: q, conversationId: convId }); return r.data ?? []; }}
-          onSelectConversation={(id) => setActiveConversationId(id)}
-          onJumpToMessage={(convId, msgId) => setActiveConversationId(convId)} />
-      )}
+        )}
+      </div>
     </div>
   );
 }

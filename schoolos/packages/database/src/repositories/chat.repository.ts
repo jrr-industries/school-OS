@@ -18,7 +18,39 @@ const messageInclude = {
 export class ChatRepository {
   // ─── Conversations ───────────────────────────────────────────
 
-  static async getConversations(userId: string, schoolId: string) {
+  static async getAllSchoolConversations(schoolId: string, currentUserId: string) {
+    const conversations = await prisma.chatConversation.findMany({
+      where: { schoolId, deletedAt: null },
+      include: {
+        participants: { where: { leftAt: null }, include: participantWithUser },
+        messages: { orderBy: { createdAt: 'desc' }, take: 1, include: { sender: { select: { id: true, name: true, avatar: true } } } },
+      },
+      orderBy: { lastMessageAt: 'desc' },
+    });
+
+    const unreadCounts = await this.getUnreadCounts(currentUserId);
+    const pinnedIds = await prisma.chatPinnedConversation.findMany({
+      where: { userId: currentUserId },
+      select: { conversationId: true },
+    });
+    const pinnedSet = new Set(pinnedIds.map((p) => p.conversationId));
+    const archivedIds = await prisma.chatArchivedConversation.findMany({
+      where: { userId: currentUserId },
+      select: { conversationId: true },
+    });
+    const archivedSet = new Set(archivedIds.map((a) => a.conversationId));
+
+    return conversations
+      .filter((c) => !c.deletedAt)
+      .map((c) => ({
+        ...c,
+        isPinned: pinnedSet.has(c.id),
+        isArchived: archivedSet.has(c.id),
+        unreadCount: unreadCounts.get(c.id) ?? 0,
+      }));
+  }
+
+  static async getConversations(userId: string, _schoolId: string) {
     const pinnedIds = await prisma.chatPinnedConversation.findMany({
       where: { userId },
       select: { conversationId: true },
@@ -150,7 +182,7 @@ export class ChatRepository {
         replyToId: data.replyToId,
         forwardedFromId: data.forwardedFromId,
         isForwarded: !!data.forwardedFromId,
-        metadata: data.metadata ?? {},
+        metadata: (data.metadata ?? {}) as Prisma.InputJsonValue,
       },
       include: messageInclude,
     });
@@ -406,15 +438,51 @@ export class ChatRepository {
 
   static async getAvailableUsers(currentUserId: string, schoolId: string, isSuperAdmin: boolean) {
     if (isSuperAdmin) {
+      const schoolAdmins = await prisma.user.findMany({
+        where: {
+          deletedAt: null,
+          isSuperAdmin: false,
+          userRoles: { some: { role: { slug: { in: ['admin', 'school_owner'] } } } },
+        },
+        select: {
+          id: true, name: true, email: true, avatar: true,
+          isSuperAdmin: true, schoolId: true,
+          school: { select: { name: true, slug: true } },
+          userRoles: { select: { role: { select: { slug: true } } } },
+        },
+        take: 50,
+      });
+      return schoolAdmins;
+    }
+
+    const isSchoolAdmin = await prisma.userRole.findFirst({
+      where: { userId: currentUserId, role: { slug: { in: ['admin', 'school_owner'] } } },
+    });
+
+    if (isSchoolAdmin) {
       return prisma.user.findMany({
-        where: { deletedAt: null, isSuperAdmin: false, schoolId },
-        select: { id: true, name: true, email: true, avatar: true, isSuperAdmin: true, schoolId: true, school: { select: { name: true, slug: true } } },
+        where: {
+          deletedAt: null,
+          schoolId,
+        },
+        select: {
+          id: true, name: true, email: true, avatar: true,
+          isSuperAdmin: true, schoolId: true,
+          school: { select: { name: true, slug: true } },
+          userRoles: { select: { role: { select: { slug: true } } } },
+        },
         take: 50,
       });
     }
+
     const superAdmins = await prisma.user.findMany({
       where: { deletedAt: null, isSuperAdmin: true },
-      select: { id: true, name: true, email: true, avatar: true, isSuperAdmin: true, schoolId: true, school: { select: { name: true, slug: true } } },
+      select: {
+        id: true, name: true, email: true, avatar: true,
+        isSuperAdmin: true, schoolId: true,
+        school: { select: { name: true, slug: true } },
+        userRoles: { select: { role: { select: { slug: true } } } },
+      },
       take: 10,
     });
     return superAdmins;

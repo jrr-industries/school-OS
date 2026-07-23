@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getDevSession } from '@/lib/dev-session';
+import { getUserWithRoles } from '@/features/chat/permissions/get-user-roles';
+import { isSameSchool } from '@/features/chat/permissions/chat-permissions';
 import { ChatService } from '@/features/chat/services/chat.service';
 
 export async function GET() {
@@ -9,9 +11,18 @@ export async function GET() {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
+  const user = await getUserWithRoles(session);
+  if (!user) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const announcements = await ChatService.getAnnouncements(session);
-    return NextResponse.json({ success: true, data: announcements });
+    const filtered = announcements.filter((a: any) => {
+      if (user.isSuperAdmin) return true;
+      return isSameSchool(user, a.schoolId);
+    });
+    return NextResponse.json({ success: true, data: filtered });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch announcements';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
@@ -22,6 +33,15 @@ export async function POST(request: NextRequest) {
   const session = await getDevSession();
   if (!session) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const user = await getUserWithRoles(session);
+  if (!user) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  if (!user.isSuperAdmin) {
+    return NextResponse.json({ success: false, error: 'Only super admins can create announcements' }, { status: 403 });
   }
 
   try {

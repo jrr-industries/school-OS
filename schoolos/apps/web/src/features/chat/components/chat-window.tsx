@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Loader2, MessageSquare, AlertCircle, ArrowDown } from 'lucide-react';
+import { Loader2, MessageSquare, ArrowDown } from 'lucide-react';
 import { ChatHeader } from './chat-header';
 import { ChatInput } from './chat-input';
 import { MessageBubble, DateSeparator } from './message-bubble';
 import { TypingIndicator } from './typing-indicator';
 import { MediaGallery } from './media-gallery';
+import { ForwardMessageDialog } from './forward-message';
+import { ExportChatButton } from './export-chat';
+import { emitNotification, requestNotificationPermission } from './notification-dropdown';
 import { useChatStore } from '../store/chat-store';
 import type { Conversation, ChatMessage } from '../types';
 
@@ -22,55 +25,53 @@ async function uploadFile(file: File) {
 export function ChatWindow({
   conversation,
   currentUserId,
-  currentUserName,
   onBack,
   onSendMessage,
   onReact,
   onEdit,
   onDelete,
-  onForward,
   onCopy,
   onStar,
   onTogglePin,
   onToggleArchive,
   onToggleMute,
-  onClearChat,
   onDeleteChat,
   onLoadMore,
   hasMore,
   isLoading,
   messages,
+  conversations,
 }: {
   conversation: Conversation;
   currentUserId: string | undefined;
-  currentUserName?: string;
   onBack: () => void;
   onSendMessage: (content: string, opts?: { replyToId?: string; fileUrl?: string; fileName?: string; fileSize?: number; fileId?: string; messageType?: string }) => void;
   onReact?: (messageId: string, emoji: string) => void;
   onEdit?: (messageId: string, content: string) => void;
   onDelete?: (messageId: string) => void;
-  onForward?: (message: ChatMessage) => void;
   onCopy?: (content: string) => void;
   onStar?: (messageId: string) => void;
   onTogglePin?: () => void;
   onToggleArchive?: () => void;
   onToggleMute?: () => void;
-  onClearChat?: () => void;
   onDeleteChat?: () => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
   isLoading?: boolean;
   messages: ChatMessage[];
+  conversations?: Conversation[];
 }) {
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [editContent, setEditContent] = useState('');
   const [showMediaGallery, setShowMediaGallery] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [forwardMessage, setForwardMessage] = useState<ChatMessage | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const typingUsers = useChatStore((s) => s.typingUsers[conversation.id] ?? []);
   const onlineUsers = useChatStore((s) => s.onlineUsers);
+  const lastMsgRef = useRef(0);
 
   const scrollToBottom = useCallback((smooth = true) => {
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
@@ -83,6 +84,26 @@ export function ChatWindow({
   useEffect(() => {
     if (messages.length > 0) scrollToBottom(false);
   }, [messages.length]);
+
+  useEffect(() => {
+    if (messages.length > lastMsgRef.current && lastMsgRef.current > 0 && currentUserId) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && lastMsg.senderId !== currentUserId) {
+        const sender = lastMsg.sender;
+        emitNotification({
+          title: sender.name ?? 'New message',
+          body: lastMsg.content || `Sent a ${lastMsg.messageType}`,
+          conversationId: conversation.id,
+          senderName: sender.name,
+        });
+      }
+    }
+    lastMsgRef.current = messages.length;
+  }, [messages.length, currentUserId, conversation.id]);
+
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
 
   const handleScroll = useCallback(() => {
     const el = messagesContainerRef.current;
@@ -120,6 +141,22 @@ export function ChatWindow({
     }
   }, [replyTo, onSendMessage]);
 
+  const handleSendVoice = useCallback(async (blob: Blob, _duration: number) => {
+    try {
+      const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
+      const result = await uploadFile(file);
+      onSendMessage('', {
+        fileUrl: result.url,
+        fileName: result.name,
+        fileSize: result.size,
+        fileId: result.fileRecordId,
+        messageType: 'voice',
+      });
+    } catch (err) {
+      console.error('Voice upload failed:', err);
+    }
+  }, [onSendMessage]);
+
   const handleStartEdit = useCallback((message: ChatMessage) => {
     setEditingMessage(message);
     setEditContent(message.content);
@@ -129,6 +166,10 @@ export function ChatWindow({
   const handleCancelEdit = useCallback(() => {
     setEditingMessage(null);
     setEditContent('');
+  }, []);
+
+  const handleForwardMessage = useCallback((message: ChatMessage) => {
+    setForwardMessage(message);
   }, []);
 
   const otherParticipant = conversation.participants.find((p) => p.userId !== currentUserId) ?? conversation.participants[0] ?? null;
@@ -161,6 +202,18 @@ export function ChatWindow({
         onDelete={onDeleteChat}
         onSearch={() => {}}
         onMediaGallery={() => setShowMediaGallery(true)}
+        exportButton={
+          <ExportChatButton
+            conversationName={conversation.title ?? otherParticipant?.user.name ?? 'Chat'}
+            messages={messages.map((m) => ({
+              id: m.id,
+              senderName: m.sender.name,
+              content: m.content,
+              createdAt: m.createdAt,
+              messageType: m.messageType,
+            }))}
+          />
+        }
       />
 
       <div
@@ -206,7 +259,7 @@ export function ChatWindow({
                     onDelete={onDelete ? () => onDelete(msg.id) : undefined}
                     onReact={onReact}
                     onEdit={(m) => handleStartEdit(m)}
-                    onForward={onForward}
+                    onForward={handleForwardMessage}
                     onCopy={onCopy ? () => onCopy(msg.content) : undefined}
                     onStar={onStar}
                   />
@@ -250,6 +303,7 @@ export function ChatWindow({
       <ChatInput
         onSend={handleSend}
         onSendFile={handleSendFile}
+        onSendVoice={handleSendVoice}
         onTyping={() => {}}
         placeholder="Type a message..."
         replyTo={replyTo ? { name: replyTo.sender.name, content: replyTo.content } : null}
@@ -261,6 +315,15 @@ export function ChatWindow({
           items={mediaItems}
           onClose={() => setShowMediaGallery(false)}
           onImageClick={(url) => window.open(url, '_blank')}
+        />
+      )}
+
+      {forwardMessage && conversations && (
+        <ForwardMessageDialog
+          conversations={conversations.filter((c) => c.id !== conversation.id)}
+          messageId={forwardMessage.id}
+          onClose={() => setForwardMessage(null)}
+          onSuccess={() => {}}
         />
       )}
     </div>

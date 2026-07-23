@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, MoreVertical, Phone, Video, Pin, Archive, Bell, BellOff, Trash2, Search, Image as ImageIcon, Info } from 'lucide-react';
+import { ArrowLeft, MoreVertical, Pin, Archive, Bell, BellOff, Trash2, Search, Image as ImageIcon } from 'lucide-react';
 import type { Participant } from '../types';
 
 export function ChatHeader({
@@ -17,6 +17,7 @@ export function ChatHeader({
   onDelete,
   onSearch,
   onMediaGallery,
+  exportButton,
 }: {
   participant: Participant | null;
   isOnline: boolean;
@@ -30,6 +31,7 @@ export function ChatHeader({
   onDelete?: () => void;
   onSearch?: () => void;
   onMediaGallery?: () => void;
+  exportButton?: React.ReactNode;
 }) {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -56,6 +58,8 @@ export function ChatHeader({
           )}
         </p>
       </div>
+
+      {exportButton}
 
       <div className="relative">
         <button

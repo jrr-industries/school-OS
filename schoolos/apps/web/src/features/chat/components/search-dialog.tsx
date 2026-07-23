@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Search, MessageSquare, X, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
+import { Search, MessageSquare, X, Loader2 } from 'lucide-react';
 import type { ChatMessage, Conversation } from '../types';
 
 interface SearchResult {
@@ -62,7 +62,7 @@ export function SearchDialog({
             id: m.id,
             content: m.content,
             conversationId: m.conversationId,
-            conversationTitle: m.conversation?.title ?? 'Conversation',
+            conversationTitle: 'Conversation',
             senderName: m.sender.name,
             createdAt: m.createdAt,
           })));

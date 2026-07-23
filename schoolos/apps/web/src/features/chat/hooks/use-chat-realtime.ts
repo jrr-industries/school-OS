@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createClientSupabaseClient } from '@schoolos/auth/client';
 import { useChatStore } from '../store/chat-store';
 
 export function useChatRealtime(conversationId: string | null) {
   const queryClient = useQueryClient();
-  const store = useChatStore();
 
   useEffect(() => {
     const supabase = createClientSupabaseClient();
@@ -134,8 +133,6 @@ export function usePresence(conversationId: string | null, userId: string | unde
 }
 
 export function useTypingBroadcast(conversationId: string | null, userId: string | undefined) {
-  const lastSent = useRef(0);
-
   useEffect(() => {
     if (!conversationId || !userId) return;
     const supabase = createClientSupabaseClient();
@@ -157,15 +154,19 @@ export function useTypingBroadcast(conversationId: string | null, userId: string
   }, [conversationId, userId]);
 }
 
+let cachedClient: ReturnType<typeof createClientSupabaseClient> | null = null;
+function getSupabaseClient() {
+  if (!cachedClient) cachedClient = createClientSupabaseClient();
+  return cachedClient;
+}
+
 export const startTyping = (conversationId: string, userId: string, userName: string) => {
-  const now = Date.now();
-  if (now - useRef(0).current < 300) return;
-  const supabase = createClientSupabaseClient();
+  const supabase = getSupabaseClient();
   if (!supabase) return;
   supabase.channel(`typing-chat-${conversationId}`).send({
     type: 'broadcast',
     event: 'typing',
-    payload: { userId, userName, timestamp: now },
+    payload: { userId, userName, timestamp: Date.now() },
   });
 };
 

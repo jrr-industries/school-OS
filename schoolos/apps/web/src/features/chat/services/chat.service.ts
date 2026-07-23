@@ -1,5 +1,4 @@
 import { prisma } from '@schoolos/database';
-import type { Prisma } from '@prisma/client';
 import type { DevSession } from '@/features/auth/types';
 import type {
   Conversation,
@@ -32,23 +31,22 @@ const conversationInclude = {
   },
 } as const;
 
-type MessageRecord = Prisma.ChatMessageGetPayload<{ include: typeof messageInclude }>;
-type ConversationRecord = Prisma.ChatConversationGetPayload<{ include: typeof conversationInclude }>;
-
 function mapSender(user: { id: string; name: string; email: string; avatar?: string | null }) {
   return { id: user.id, name: user.name, email: user.email, avatar: user.avatar ?? null };
 }
 
-function mapMessage(m: MessageRecord): ChatMessage {
+function mapMessage(m: any): ChatMessage {
   return {
     id: m.id,
     conversationId: m.conversationId,
     senderId: m.senderId,
     content: m.content,
-    messageType: m.messageType as MessageType,
+    messageType: (m.messageType as MessageType) ?? 'text',
+    messageStatus: (m.messageStatus as any) ?? 'sent',
     fileUrl: m.fileUrl,
     fileName: m.fileName,
     fileSize: m.fileSize,
+    fileId: m.fileId ?? null,
     replyToId: m.replyToId,
     replyTo: m.replyTo
       ? {
@@ -56,71 +54,77 @@ function mapMessage(m: MessageRecord): ChatMessage {
           conversationId: m.replyTo.conversationId,
           senderId: m.replyTo.senderId,
           content: m.replyTo.content,
-          messageType: m.replyTo.messageType as MessageType,
+          messageType: (m.replyTo.messageType as MessageType) ?? 'text',
+          messageStatus: (m.replyTo.messageStatus as any) ?? 'sent',
           fileUrl: m.replyTo.fileUrl,
           fileName: m.replyTo.fileName,
           fileSize: m.replyTo.fileSize,
+          fileId: m.replyTo.fileId ?? null,
           replyToId: m.replyTo.replyToId,
           replyTo: null,
+          forwardedFromId: m.replyTo.forwardedFromId ?? null,
+          forwardedFrom: null,
+          isEdited: m.replyTo.isEdited ?? false,
+          isForwarded: m.replyTo.isForwarded ?? false,
           editedAt: m.replyTo.editedAt?.toISOString() ?? null,
           deletedAt: m.replyTo.deletedAt?.toISOString() ?? null,
           createdAt: m.replyTo.createdAt.toISOString(),
           updatedAt: m.replyTo.updatedAt.toISOString(),
+          metadata: m.replyTo.metadata ?? null,
           sender: mapSender(m.replyTo.sender),
           readReceipts: [],
+          reactions: [],
+          isStarred: false,
         }
       : null,
+    forwardedFromId: m.forwardedFromId ?? null,
+    forwardedFrom: null,
+    isEdited: m.isEdited ?? false,
+    isForwarded: m.isForwarded ?? false,
     editedAt: m.editedAt?.toISOString() ?? null,
     deletedAt: m.deletedAt?.toISOString() ?? null,
     createdAt: m.createdAt.toISOString(),
     updatedAt: m.updatedAt.toISOString(),
+    metadata: m.metadata ?? null,
     sender: mapSender(m.sender),
-    readReceipts: m.readReceipts.map((r) => ({
+    file: m.file ?? null,
+    readReceipts: (m.readReceipts ?? []).map((r: any) => ({
       id: r.id,
-      messageId: r.messageId,
+      messageId: r.messageId ?? m.id,
       userId: r.userId,
-      readAt: r.readAt.toISOString(),
+      readAt: r.readAt?.toISOString() ?? new Date().toISOString(),
     })),
+    reactions: [],
+    isStarred: false,
   };
 }
 
-function mapConversation(c: ConversationRecord): Conversation {
+function mapConversation(c: any): Conversation {
   return {
     id: c.id,
     schoolId: c.schoolId,
     title: c.title,
     isGroup: c.isGroup,
-    isPinned: c.isPinned,
-    isArchived: c.isArchived,
+    isPinned: false,
+    isArchived: false,
+    isMuted: false,
+    lastMessageAt: c.updatedAt?.toISOString() ?? null,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
-    participants: c.participants.map((p) => ({
+    participants: c.participants.map((p: any) => ({
       id: p.id,
       userId: p.userId,
+      role: p.role ?? 'member',
+      isMuted: p.isMuted ?? false,
+      notificationsEnabled: p.notificationsEnabled ?? true,
       lastReadAt: p.lastReadAt?.toISOString() ?? null,
       joinedAt: p.joinedAt.toISOString(),
       leftAt: p.leftAt?.toISOString() ?? null,
       user: { ...mapSender(p.user), isSuperAdmin: p.user.isSuperAdmin },
     })),
-    messages: c.messages.map((m) => ({
-      id: m.id,
-      conversationId: m.conversationId,
-      senderId: m.senderId,
-      content: m.content,
-      messageType: m.messageType as MessageType,
-      fileUrl: m.fileUrl,
-      fileName: m.fileName,
-      fileSize: m.fileSize,
-      replyToId: m.replyToId,
-      replyTo: null,
-      editedAt: m.editedAt?.toISOString() ?? null,
-      deletedAt: m.deletedAt?.toISOString() ?? null,
-      createdAt: m.createdAt.toISOString(),
-      updatedAt: m.updatedAt.toISOString(),
-      sender: mapSender(m.sender),
-      readReceipts: [],
-    })),
+    messages: c.messages.map((m: any) => mapMessage(m)),
     unreadCount: 0,
+    lastMessage: c.messages?.[0] ? mapMessage(c.messages[0]) : null,
   };
 }
 
@@ -319,6 +323,9 @@ export class ChatService {
         target: payload.target as any,
         targetSchoolIds: payload.targetSchoolIds ? JSON.stringify(payload.targetSchoolIds) : '[]',
         priority: payload.priority ?? 'normal',
+        attachmentUrl: payload.attachmentUrl,
+        attachmentName: payload.attachmentName,
+        attachmentSize: payload.attachmentSize,
         createdById: user.id,
       },
       include: {
@@ -335,8 +342,12 @@ export class ChatService {
       targetSchoolIds: JSON.parse(announcement.targetSchoolIds as string ?? '[]'),
       status: announcement.status as Announcement['status'],
       priority: announcement.priority,
+      attachmentUrl: announcement.attachmentUrl,
+      attachmentName: announcement.attachmentName,
+      attachmentSize: announcement.attachmentSize,
       createdById: announcement.createdById,
       createdBy: mapSender(announcement.createdBy),
+      receipts: [],
       createdAt: announcement.createdAt.toISOString(),
       updatedAt: announcement.updatedAt.toISOString(),
     };
@@ -353,7 +364,7 @@ export class ChatService {
       },
     });
 
-    return announcements.map((a) => ({
+    return announcements.map((a: any) => ({
       id: a.id,
       schoolId: a.schoolId,
       title: a.title,
@@ -362,8 +373,12 @@ export class ChatService {
       targetSchoolIds: JSON.parse(a.targetSchoolIds as string ?? '[]'),
       status: a.status as Announcement['status'],
       priority: a.priority,
+      attachmentUrl: a.attachmentUrl,
+      attachmentName: a.attachmentName,
+      attachmentSize: a.attachmentSize,
       createdById: a.createdById,
       createdBy: mapSender(a.createdBy),
+      receipts: [],
       createdAt: a.createdAt.toISOString(),
       updatedAt: a.updatedAt.toISOString(),
     }));

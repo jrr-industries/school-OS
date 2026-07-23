@@ -5,7 +5,6 @@ import type { InfiniteData } from '@tanstack/react-query';
 import type {
   ChatMessage,
   SendMessagePayload,
-  CreateConversationPayload,
   CreateAnnouncementPayload,
 } from '../types';
 import {

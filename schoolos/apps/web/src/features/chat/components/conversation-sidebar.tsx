@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { cn } from '@schoolos/ui';
-import { Search, Plus, Pin, Archive, Check, CheckCheck, MessageSquare, Loader2, UserPlus, X } from 'lucide-react';
+import { Search, Plus, Pin, Archive, Check, CheckCheck, MessageSquare, Loader2, X } from 'lucide-react';
 import type { Conversation, ChatUser } from '../types';
 
 function formatTime(iso: string) {
@@ -20,7 +20,7 @@ export function ConversationSidebar({
   conversations,
   activeId,
   onSelect,
-  onNewChat,
+  onStartChat,
   availableUsers,
   currentUserId,
   isLoading,
@@ -30,7 +30,7 @@ export function ConversationSidebar({
   conversations: Conversation[];
   activeId: string | null;
   onSelect: (id: string) => void;
-  onNewChat?: () => void;
+  onStartChat?: (userId: string) => void;
   availableUsers?: ChatUser[];
   currentUserId?: string;
   isLoading?: boolean;
@@ -177,7 +177,7 @@ export function ConversationSidebar({
         </button>
       </div>
 
-      {showNewChat && onNewChat && (
+      {showNewChat && onStartChat && availableUsers && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowNewChat(false)}>
           <div className="bg-card rounded-xl border shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b">
@@ -200,7 +200,7 @@ export function ConversationSidebar({
                 {filteredUsers.map((user) => (
                   <button
                     key={user.id}
-                    onClick={() => { onNewChat(); setShowNewChat(false); }}
+                    onClick={() => { onStartChat(user.id); setShowNewChat(false); }}
                     className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-left"
                   >
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0">
@@ -208,13 +208,17 @@ export function ConversationSidebar({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{user.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {user.school ? `${user.school.name} · ` : ''}{user.email}
+                      </p>
                     </div>
                   </button>
                 ))}
-                {filteredUsers.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">No users found</p>
-                )}
+                {filteredUsers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    {availableUsers.length === 0 ? 'Loading users...' : 'No users found'}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>

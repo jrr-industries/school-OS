@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { cn } from '@schoolos/ui';
-import { Check, CheckCheck, FileText, Image, File, Trash2, Reply, Download, Video, Music, Table, Archive, Forward, Copy, Edit3, Star, MoreHorizontal, Pin, Smile, ExternalLink } from 'lucide-react';
+import { Check, CheckCheck, FileText, Image, File, Trash2, Reply, Download, Video, Music, Table, Archive, Forward, Copy, Edit3, Star, MoreHorizontal, Pin, Smile } from 'lucide-react';
 import { ReactionPicker } from './emoji-picker';
 import { ImageViewer } from './image-viewer';
+import { VoiceMessage } from './voice-message';
+import { extractUrls, UrlPreviewInline, formatMessageWithUrls } from './url-preview';
 import type { ChatMessage } from '../types';
 
 function formatTime(iso: string) {
@@ -57,6 +59,16 @@ export function DateSeparator({ date }: { date: string }) {
       <span className="text-xs font-medium text-muted-foreground shrink-0">{formatDateSeparator(date)}</span>
       <div className="flex-1 h-px bg-border" />
     </div>
+  );
+}
+
+function ContentWithUrls({ content }: { content: string }) {
+  const urls = extractUrls(content);
+  return (
+    <p className="leading-relaxed whitespace-pre-wrap break-words">
+      {formatMessageWithUrls(content)}
+      {urls.length > 0 && <UrlPreviewInline url={urls[0]} />}
+    </p>
   );
 }
 
@@ -155,7 +167,13 @@ export function MessageBubble({
               </div>
             )}
 
-            {(message.messageType === 'audio' || message.messageType === 'voice') && message.fileUrl && (
+            {(message.messageType === 'voice') && message.fileUrl && (
+              <div className="mb-2">
+                <VoiceMessage src={message.fileUrl} />
+              </div>
+            )}
+
+            {(message.messageType === 'audio') && message.fileUrl && (
               <div className="mb-2">
                 <audio src={message.fileUrl} controls className="w-full" preload="metadata">
                   <p>Your browser doesn't support audio playback.</p>
@@ -179,10 +197,14 @@ export function MessageBubble({
             )}
 
             {message.content && (
-              <p className="leading-relaxed whitespace-pre-wrap break-words">
+              <div>
                 {message.isEdited && <span className="text-[10px] opacity-60 mr-1">edited</span>}
-                {message.content}
-              </p>
+                {message.messageType === 'text' ? (
+                  <ContentWithUrls content={message.content} />
+                ) : (
+                  <p className="leading-relaxed whitespace-pre-wrap break-words">{formatMessageWithUrls(message.content)}</p>
+                )}
+              </div>
             )}
 
             <div className={cn(
