@@ -179,10 +179,26 @@ enum PromotionStatus {
 enum MessageType {
   text
   image
+  video
   pdf
-  document
+  word
+  excel
+  powerpoint
+  zip
   voice
+  audio
+  document
   system
+  announcement
+}
+
+enum MessageStatus {
+  pending
+  sending
+  sent
+  delivered
+  seen
+  failed
 }
 
 enum AnnouncementTarget {
@@ -361,10 +377,15 @@ model User {
   auditLogs     AuditLog[]
   notifications Notification[]
   employee      Employee?
-  chatParticipants ChatConversationParticipant[]
-  chatMessages     ChatMessage[]
-  messageReads     MessageRead[]
-  announcements    Announcement[]
+  chatParticipants       ChatConversationParticipant[]
+  chatMessages           ChatMessage[]
+  messageReads           MessageRead[]
+  messageReactions       ChatMessageReaction[]
+  starredMessages        ChatStarredMessage[]
+  pinnedConversations    ChatPinnedConversation[]
+  archivedConversations  ChatArchivedConversation[]
+  announcementReceipts   AnnouncementReceipt[]
+  announcements          Announcement[]
 
   @@index([schoolId])
   @@index([email])
@@ -567,86 +588,163 @@ model Notification {
 }
 
 model ChatConversation {
-  id        String   @id @default(uuid()) @db.Uuid
-  schoolId  String   @map("school_id") @db.Uuid
-  title     String?  @db.VarChar(200)
-  isGroup   Boolean  @default(false) @map("is_group")
-  isPinned  Boolean  @default(false) @map("is_pinned")
-  isArchived Boolean @default(false) @map("is_archived")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
-  version   Int      @default(1) @map("version")
+  id           String    @id @default(uuid()) @db.Uuid
+  schoolId     String    @map("school_id") @db.Uuid
+  title        String?   @db.VarChar(200)
+  isGroup      Boolean   @default(false) @map("is_group")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  lastMessageAt DateTime? @map("last_message_at")
+  deletedAt    DateTime? @map("deleted_at")
+  version      Int       @default(1) @map("version")
 
-  school       School                       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  participants ChatConversationParticipant[]
-  messages     ChatMessage[]
-  readReceipts MessageRead[]
+  school        School                           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  participants  ChatConversationParticipant[]
+  messages      ChatMessage[]
+  readReceipts  MessageRead[]
+  pinnedBy      ChatPinnedConversation[]
+  archivedBy    ChatArchivedConversation[]
 
   @@index([schoolId])
   @@index([updatedAt])
+  @@index([lastMessageAt])
   @@map("chat_conversations")
 }
 
 model ChatConversationParticipant {
-  id             String   @id @default(uuid()) @db.Uuid
-  conversationId String   @map("conversation_id") @db.Uuid
-  userId         String   @map("user_id") @db.Uuid
-  lastReadAt     DateTime? @map("last_read_at")
-  joinedAt       DateTime @default(now()) @map("joined_at")
-  leftAt         DateTime? @map("left_at")
+  id                 String    @id @default(uuid()) @db.Uuid
+  conversationId     String    @map("conversation_id") @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  role               String    @default("member") @db.VarChar(20)
+  isMuted            Boolean   @default(false) @map("is_muted")
+  notificationsEnabled Boolean @default(true) @map("notifications_enabled")
+  lastReadAt         DateTime? @map("last_read_at")
+  joinedAt           DateTime  @default(now()) @map("joined_at")
+  leftAt             DateTime? @map("left_at")
 
   conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User             @relation(fields: [userId], references: [id])
 
   @@unique([conversationId, userId])
   @@index([userId])
+  @@index([conversationId])
   @@map("chat_conversation_participants")
 }
 
 model ChatMessage {
-  id             String      @id @default(uuid()) @db.Uuid
-  conversationId String      @map("conversation_id") @db.Uuid
-  senderId       String      @map("sender_id") @db.Uuid
-  content        String      @db.Text
-  messageType    MessageType @default(text) @map("message_type")
-  fileUrl        String?     @map("file_url") @db.Text
-  fileName       String?     @map("file_name") @db.VarChar(255)
-  fileSize       Int?        @map("file_size")
-  replyToId      String?     @map("reply_to_id") @db.Uuid
-  editedAt       DateTime?   @map("edited_at")
-  deletedAt      DateTime?   @map("deleted_at")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
-  version        Int         @default(1) @map("version")
+  id              String        @id @default(uuid()) @db.Uuid
+  conversationId  String        @map("conversation_id") @db.Uuid
+  senderId        String        @map("sender_id") @db.Uuid
+  content         String        @db.Text
+  messageType     MessageType   @default(text) @map("message_type")
+  messageStatus   MessageStatus @default(sent) @map("message_status")
+  fileUrl         String?       @map("file_url") @db.Text
+  fileName        String?       @map("file_name") @db.VarChar(255)
+  fileSize        Int?          @map("file_size")
+  fileId          String?       @map("file_id") @db.Uuid
+  replyToId       String?       @map("reply_to_id") @db.Uuid
+  forwardedFromId String?       @map("forwarded_from_id") @db.Uuid
+  isEdited        Boolean       @default(false) @map("is_edited")
+  isForwarded     Boolean       @default(false) @map("is_forwarded")
+  metadata        Json?         @default("{}")
+  editedAt        DateTime?     @map("edited_at")
+  deletedAt       DateTime?     @map("deleted_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  version         Int           @default(1) @map("version")
 
-  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User             @relation(fields: [senderId], references: [id])
-  replyTo      ChatMessage?     @relation("MessageReply", fields: [replyToId], references: [id])
-  replies      ChatMessage[]    @relation("MessageReply")
-  readReceipts MessageRead[]
+  conversation    ChatConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender          User                 @relation(fields: [senderId], references: [id])
+  file            File?                @relation(fields: [fileId], references: [id])
+  replyTo         ChatMessage?         @relation("MessageReply", fields: [replyToId], references: [id])
+  forwardedFrom   ChatMessage?         @relation("MessageForward", fields: [forwardedFromId], references: [id])
+  replies         ChatMessage[]        @relation("MessageReply")
+  forwardedBy     ChatMessage[]        @relation("MessageForward")
+  readReceipts    MessageRead[]
+  reactions       ChatMessageReaction[]
+  starredBy       ChatStarredMessage[]
 
   @@index([conversationId, createdAt])
   @@index([senderId])
+  @@index([messageStatus])
   @@map("chat_messages")
 }
 
-model MessageRead {
+model ChatMessageReaction {
   id        String   @id @default(uuid()) @db.Uuid
   messageId String   @map("message_id") @db.Uuid
   userId    String   @map("user_id") @db.Uuid
-  readAt    DateTime @default(now()) @map("read_at")
+  emoji     String   @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
 
-  message    ChatMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user       User             @relation(fields: [userId], references: [id])
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+  @@map("chat_message_reactions")
+}
+
+model ChatStarredMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+  @@map("chat_starred_messages")
+}
+
+model MessageRead {
+  id             String   @id @default(uuid()) @db.Uuid
+  messageId      String   @map("message_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  readAt         DateTime @default(now()) @map("read_at")
+
+  message      ChatMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id])
   conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  conversationId String @map("conversation_id") @db.Uuid
 
   @@unique([messageId, userId])
   @@index([messageId])
   @@index([userId])
   @@index([conversationId])
   @@map("message_reads")
+}
+
+model ChatPinnedConversation {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@map("chat_pinned_conversations")
+}
+
+model ChatArchivedConversation {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@map("chat_archived_conversations")
 }
 
 model Announcement {
@@ -658,19 +756,39 @@ model Announcement {
   targetSchoolIds Json?              @default("[]") @map("target_school_ids")
   status          AnnouncementStatus @default(published) @map("status")
   priority        String             @default("normal") @db.VarChar(20)
+  attachmentUrl   String?            @map("attachment_url") @db.Text
+  attachmentName  String?            @map("attachment_name") @db.VarChar(255)
+  attachmentSize  Int?               @map("attachment_size")
   createdById     String             @map("created_by_id") @db.Uuid
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
   deletedAt       DateTime?          @map("deleted_at")
   version         Int                @default(1) @map("version")
 
-  school School? @relation(fields: [schoolId], references: [id])
-  createdBy User  @relation(fields: [createdById], references: [id])
+  school  School?               @relation(fields: [schoolId], references: [id])
+  createdBy User                @relation(fields: [createdById], references: [id])
+  receipts AnnouncementReceipt[]
 
   @@index([schoolId])
   @@index([status])
   @@index([createdAt])
   @@map("announcements")
+}
+
+model AnnouncementReceipt {
+  id             String   @id @default(uuid()) @db.Uuid
+  announcementId String   @map("announcement_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  readAt         DateTime @default(now()) @map("read_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([announcementId, userId])
+  @@index([announcementId])
+  @@index([userId])
+  @@map("announcement_receipts")
 }
 
 model Setting {
@@ -780,7 +898,8 @@ model File {
   updatedBy   String?  @map("updated_by") @db.Uuid
   version     Int      @default(1) @map("version")
 
-  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  school       School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  chatMessages ChatMessage[]
 
   @@index([schoolId])
   @@index([userId])

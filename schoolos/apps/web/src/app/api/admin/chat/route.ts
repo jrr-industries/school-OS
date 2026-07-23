@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
         fileUrl: body.fileUrl,
         fileName: body.fileName,
         fileSize: body.fileSize,
+        fileId: body.fileId,
         replyToId: body.replyToId,
       });
       return NextResponse.json({ success: true, data: message });

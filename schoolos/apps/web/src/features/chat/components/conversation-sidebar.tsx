@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { cn } from '@schoolos/ui';
-import { MessageSquare, Plus, Search, Loader2, Pin, Archive, AlertCircle } from 'lucide-react';
+import { Search, Plus, Pin, Archive, Check, CheckCheck, MessageSquare, Loader2, UserPlus, X } from 'lucide-react';
 import type { Conversation, ChatUser } from '../types';
 
 function formatTime(iso: string) {
@@ -18,229 +18,273 @@ function formatTime(iso: string) {
 
 export function ConversationSidebar({
   conversations,
-  activeConversationId,
+  activeId,
   onSelect,
   onNewChat,
+  availableUsers,
+  currentUserId,
+  isLoading,
   searchQuery,
   onSearchChange,
-  loading,
-  error,
-  availableUsers,
-  onStartNewChat,
-  newChatLoading,
-  currentUserId,
 }: {
   conversations: Conversation[];
-  activeConversationId: string | null;
-  onSelect: (conv: Conversation) => void;
-  onNewChat: () => void;
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
-  loading: boolean;
-  error: string | null;
-  availableUsers: ChatUser[];
-  onStartNewChat: (user: ChatUser) => void;
-  newChatLoading: boolean;
+  activeId: string | null;
+  onSelect: (id: string) => void;
+  onNewChat?: () => void;
+  availableUsers?: ChatUser[];
   currentUserId?: string;
+  isLoading?: boolean;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }) {
+  const [localSearch, setLocalSearch] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const search = onSearchChange !== undefined ? (searchQuery ?? '') : localSearch;
 
-  const getOtherParticipant = (conv: Conversation) => {
-    const other = conv.participants.find((p) => p.userId !== currentUserId);
-    return other?.user ?? conv.participants[0]?.user ?? null;
-  };
+  const setSearch = onSearchChange ?? setLocalSearch;
 
-  const getLastMessage = (conv: Conversation) => {
-    return conv.messages[0] ?? null;
-  };
-
-  const filteredConvs = useMemo(() => {
-    return conversations.filter((conv) => {
-      if (!searchQuery) return true;
-      const other = getOtherParticipant(conv);
-      return other?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             other?.email.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredConversations = useMemo(() => {
+    if (!search.trim()) return conversations;
+    const q = search.toLowerCase();
+    return conversations.filter((c) => {
+      if (c.title?.toLowerCase().includes(q)) return true;
+      return c.participants.some((p) => p.user.name.toLowerCase().includes(q));
     });
-  }, [conversations, searchQuery]);
+  }, [conversations, search]);
 
-  const pinnedConvs = filteredConvs.filter((c) => c.isPinned);
-  const normalConvs = filteredConvs.filter((c) => !c.isPinned);
+  const pinnedConversations = useMemo(() => filteredConversations.filter((c) => c.isPinned), [filteredConversations]);
+  const normalConversations = useMemo(() => filteredConversations.filter((c) => !c.isPinned && !c.isArchived), [filteredConversations]);
+  const archivedConversations = useMemo(() => filteredConversations.filter((c) => c.isArchived), [filteredConversations]);
+
+  const filteredUsers = useMemo(() => {
+    if (!availableUsers) return [];
+    const q = userSearch.toLowerCase();
+    return availableUsers.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+  }, [availableUsers, userSearch]);
+
+  const getOtherParticipant = (conv: Conversation) => conv.participants.find((p) => p.userId !== currentUserId);
 
   return (
-    <>
-      <div className="w-80 lg:w-96 border-r flex flex-col bg-background">
-        <div className="p-3 border-b">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-lg font-semibold">Chats</h1>
-            <button
-              onClick={() => { onNewChat(); setShowNewChat(true); }}
-              className="rounded-full p-2 text-muted-foreground hover:bg-muted transition-colors"
-              title="New conversation"
-            >
-              <Plus className="h-5 w-5" />
+    <div className="flex flex-col h-full bg-card border-r">
+      <div className="p-4 border-b">
+        <h1 className="text-lg font-semibold mb-3">Messages</h1>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search conversations..."
+            className="w-full h-9 pl-9 pr-8 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
             </button>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              placeholder="Search conversations..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full h-9 rounded-lg border-0 bg-muted pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </div>
-        </div>
-
-        {error && (
-          <div className="mx-3 mt-2 rounded-lg bg-destructive/10 border border-destructive/20 p-2 text-xs text-destructive">
-            <div className="flex items-center gap-1.5">
-              <AlertCircle className="h-3 w-3" />
-              <span>{error}</span>
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredConvs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-              <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">No conversations yet</p>
-              <button
-                onClick={() => { onNewChat(); setShowNewChat(true); }}
-                className="mt-2 text-sm text-primary hover:underline"
-              >
-                Start a chat
-              </button>
-            </div>
-          ) : (
-            <>
-              {pinnedConvs.length > 0 && (
-                <div>
-                  <div className="px-3 py-1.5 flex items-center gap-1.5">
-                    <Pin className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Pinned</span>
-                  </div>
-                  {pinnedConvs.map((conv) => {
-                    const other = getOtherParticipant(conv);
-                    const lastMsg = getLastMessage(conv);
-                    return (
-                      <ConversationItem
-                        key={conv.id}
-                        conv={conv}
-                        other={other}
-                        lastMsg={lastMsg}
-                        isActive={activeConversationId === conv.id}
-                        onSelect={() => onSelect(conv)}
-                      />
-                    );
-                  })}
-                  <div className="h-px bg-border mx-3 my-1" />
-                </div>
-              )}
-
-              {normalConvs.map((conv) => {
-                const other = getOtherParticipant(conv);
-                const lastMsg = getLastMessage(conv);
-                return (
-                  <ConversationItem
-                    key={conv.id}
-                    conv={conv}
-                    other={other}
-                    lastMsg={lastMsg}
-                    isActive={activeConversationId === conv.id}
-                    onSelect={() => onSelect(conv)}
-                  />
-                );
-              })}
-            </>
           )}
         </div>
       </div>
 
-      {showNewChat && (
+      <div className="flex-1 overflow-y-auto">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : conversations.length === 0 && !search ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+              <MessageSquare className="h-6 w-6 text-primary" />
+            </div>
+            <p className="text-sm font-medium">No conversations yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Start a new chat to begin messaging</p>
+          </div>
+        ) : (
+          <>
+            {pinnedConversations.length > 0 && (
+              <div className="px-3 pt-3 pb-1">
+                <div className="flex items-center gap-1.5 px-2 mb-1">
+                  <Pin className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Pinned</span>
+                </div>
+                {pinnedConversations.map((conv) => (
+                  <ConversationItem
+                    key={conv.id}
+                    conversation={conv}
+                    isActive={conv.id === activeId}
+                    onClick={() => onSelect(conv.id)}
+                    otherParticipant={getOtherParticipant(conv)}
+                    currentUserId={currentUserId}
+                  />
+                ))}
+              </div>
+            )}
+
+            {normalConversations.length > 0 && (
+              <div className="px-3 pt-3 pb-1">
+                <div className="px-2 mb-1">
+                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    {pinnedConversations.length > 0 ? 'All Messages' : 'Messages'}
+                  </span>
+                </div>
+                {normalConversations.map((conv) => (
+                  <ConversationItem
+                    key={conv.id}
+                    conversation={conv}
+                    isActive={conv.id === activeId}
+                    onClick={() => onSelect(conv.id)}
+                    otherParticipant={getOtherParticipant(conv)}
+                    currentUserId={currentUserId}
+                  />
+                ))}
+              </div>
+            )}
+
+            {archivedConversations.length > 0 && (
+              <div className="px-3 pt-3 pb-1">
+                <div className="flex items-center gap-1.5 px-2 mb-1">
+                  <Archive className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Archived</span>
+                </div>
+                {archivedConversations.map((conv) => (
+                  <ConversationItem
+                    key={conv.id}
+                    conversation={conv}
+                    isActive={conv.id === activeId}
+                    onClick={() => onSelect(conv.id)}
+                    otherParticipant={getOtherParticipant(conv)}
+                    currentUserId={currentUserId}
+                  />
+                ))}
+              </div>
+            )}
+
+            {filteredConversations.length === 0 && search && (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                <p className="text-sm text-muted-foreground">No conversations match &quot;{search}&quot;</p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="p-3 border-t">
+        <button
+          onClick={() => setShowNewChat(true)}
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          New Chat
+        </button>
+      </div>
+
+      {showNewChat && onNewChat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowNewChat(false)}>
-          <div className="bg-background rounded-xl shadow-xl w-full max-w-md p-6 mx-4 border" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold mb-4">New Conversation</h2>
-            <div className="space-y-1 max-h-80 overflow-y-auto">
-              {availableUsers.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No users available</p>
-              ) : (
-                availableUsers.map((u) => (
+          <div className="bg-card rounded-xl border shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="font-semibold">New Conversation</h2>
+              <button onClick={() => setShowNewChat(false)} className="p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4">
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="Search users..."
+                  className="w-full h-9 pl-9 pr-4 rounded-lg border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto space-y-1">
+                {filteredUsers.map((user) => (
                   <button
-                    key={u.id}
-                    onClick={() => {
-                      onStartNewChat(u);
-                      setShowNewChat(false);
-                    }}
-                    disabled={newChatLoading}
-                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted text-left transition-colors disabled:opacity-50"
+                    key={user.id}
+                    onClick={() => { onNewChat(); setShowNewChat(false); }}
+                    className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-left"
                   >
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary shrink-0">
-                      {u.name.charAt(0).toUpperCase()}
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0">
+                      {user.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{u.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{u.role} - {u.school?.name ?? 'Platform'}</p>
+                      <p className="text-sm font-medium truncate">{user.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                     </div>
                   </button>
-                ))
-              )}
+                ))}
+                {filteredUsers.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">No users found</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
 function ConversationItem({
-  conv,
-  other,
-  lastMsg,
+  conversation,
   isActive,
-  onSelect,
+  onClick,
+  otherParticipant,
+  currentUserId,
 }: {
-  conv: Conversation;
-  other: { id: string; name: string; email: string; avatar: string | null } | null;
-  lastMsg: { content: string; createdAt: string; senderId: string } | null;
+  conversation: Conversation;
   isActive: boolean;
-  onSelect: () => void;
+  onClick: () => void;
+  otherParticipant?: { user: { name: string; avatar: string | null } } | null;
+  currentUserId?: string;
 }) {
+  const lastMsg = conversation.messages?.[0];
+  const name = conversation.title ?? otherParticipant?.user.name ?? 'Unknown';
+  const avatarChar = name.charAt(0).toUpperCase();
+  const hasUnread = (conversation.unreadCount ?? 0) > 0;
+
   return (
     <button
-      onClick={onSelect}
+      onClick={onClick}
       className={cn(
-        'w-full flex items-center gap-3 p-3 text-left hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0',
-        isActive ? 'bg-primary/5' : ''
+        'flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-colors text-left',
+        isActive ? 'bg-primary/10' : 'hover:bg-muted'
       )}
     >
-      <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary shrink-0 relative">
-        {other ? other.name.charAt(0).toUpperCase() : '?'}
-        {conv.unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground px-1">
-            {conv.unreadCount > 99 ? '99+' : conv.unreadCount}
+      <div className="relative shrink-0">
+        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+          {otherParticipant?.user.avatar ? (
+            <img src={otherParticipant.user.avatar} alt="" className="h-full w-full rounded-full object-cover" />
+          ) : avatarChar}
+        </div>
+        {hasUnread && (
+          <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[9px] font-bold text-primary-foreground flex items-center justify-center">
+            {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
           </span>
         )}
       </div>
+
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium truncate flex items-center gap-1.5">
-            {other?.name ?? 'Unknown'}
-            {conv.isPinned && <Pin className="h-3 w-3 text-muted-foreground" />}
-            {conv.isArchived && <Archive className="h-3 w-3 text-muted-foreground" />}
-          </p>
-          {lastMsg && <span className="text-[11px] text-muted-foreground shrink-0 ml-2">{formatTime(lastMsg.createdAt)}</span>}
+        <div className="flex items-center justify-between gap-2">
+          <p className={cn('text-sm truncate', hasUnread ? 'font-semibold' : 'font-medium')}>{name}</p>
+          {lastMsg && <span className="text-[10px] text-muted-foreground shrink-0">{formatTime(lastMsg.createdAt)}</span>}
         </div>
-        <div className="flex items-center justify-between mt-0.5">
-          <p className={cn(
-            'text-xs truncate',
-            conv.unreadCount > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'
-          )}>
-            {lastMsg ? lastMsg.content : 'No messages yet'}
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <p className="text-xs text-muted-foreground truncate">
+            {lastMsg ? (
+              <>
+                {lastMsg.senderId === currentUserId && (
+                  lastMsg.readReceipts?.length > 0 ? <CheckCheck className="h-3 w-3 inline mr-0.5 text-blue-400" />
+                  : <Check className="h-3 w-3 inline mr-0.5" />
+                )}
+                {lastMsg.messageType === 'image' ? '📷 Image'
+                : lastMsg.messageType === 'video' ? '🎬 Video'
+                : lastMsg.messageType === 'audio' || lastMsg.messageType === 'voice' ? '🎵 Audio'
+                : lastMsg.messageType !== 'text' ? '📎 File'
+                : lastMsg.content}
+              </>
+            ) : (
+              <span className="italic">No messages yet</span>
+            )}
           </p>
         </div>
       </div>

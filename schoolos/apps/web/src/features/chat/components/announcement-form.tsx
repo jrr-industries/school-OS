@@ -1,116 +1,128 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Plus, Globe, Building2 } from 'lucide-react';
-import type { AnnouncementTarget, CreateAnnouncementPayload } from '../types';
+import { X, Loader2, Upload } from 'lucide-react';
+import type { CreateAnnouncementPayload, AnnouncementTarget } from '../types';
 
 export function AnnouncementForm({
   onSubmit,
   onClose,
+  isSubmitting,
 }: {
-  onSubmit: (payload: CreateAnnouncementPayload) => Promise<void>;
+  onSubmit: (payload: CreateAnnouncementPayload) => void;
   onClose: () => void;
+  isSubmitting?: boolean;
 }) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [target, setTarget] = useState<AnnouncementTarget>('all_schools');
   const [priority, setPriority] = useState('normal');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [attachmentName, setAttachmentName] = useState('');
+  const [uploading, setUploading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+    onSubmit({
+      title: title.trim(),
+      content: content.trim() || undefined,
+      target,
+      priority,
+      attachmentUrl: attachmentUrl || undefined,
+      attachmentName: attachmentName || undefined,
+    });
+  };
 
-    setSubmitting(true);
-    setError(null);
-
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
     try {
-      await onSubmit({ title: title.trim(), content: content.trim() || undefined, target, priority });
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create announcement');
-    } finally {
-      setSubmitting(false);
-    }
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const json = await res.json();
+      if (json.success) {
+        setAttachmentUrl(json.data.url);
+        setAttachmentName(json.data.name);
+      }
+    } catch { /* ignore */ }
+    setUploading(false);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-background rounded-xl shadow-xl w-full max-w-lg p-6 mx-4 border" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold mb-4">New Announcement</h2>
+      <div className="bg-card rounded-xl border shadow-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-lg font-semibold">New Announcement</h2>
+          <button onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Title</label>
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Title *</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Announcement title"
               required
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Content</label>
+          <div>
+            <label className="block text-sm font-medium mb-1">Content</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              placeholder="Announcement content..."
               rows={4}
-              placeholder="Announcement details..."
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Target</label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTarget('all_schools')}
-                  className={`flex-1 flex items-center justify-center gap-2 rounded-lg border p-2.5 text-sm transition-colors ${
-                    target === 'all_schools'
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-input hover:bg-muted'
-                  }`}
-                >
-                  <Globe className="h-4 w-4" />
-                  All Schools
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTarget('specific_school')}
-                  className={`flex-1 flex items-center justify-center gap-2 rounded-lg border p-2.5 text-sm transition-colors ${
-                    target === 'specific_school'
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-input hover:bg-muted'
-                  }`}
-                >
-                  <Building2 className="h-4 w-4" />
-                  Specific
-                </button>
-              </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Target</label>
+              <select
+                value={target}
+                onChange={(e) => setTarget(e.target.value as AnnouncementTarget)}
+                className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="all_schools">All Schools</option>
+                <option value="specific_school">Specific School</option>
+                <option value="multiple_schools">Multiple Schools</option>
+              </select>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Priority</label>
+            <div>
+              <label className="block text-sm font-medium mb-1">Priority</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="low">Low</option>
                 <option value="normal">Normal</option>
                 <option value="high">High</option>
+                <option value="urgent">Urgent</option>
               </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Attachment (optional)</label>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-input bg-background text-sm cursor-pointer hover:bg-muted transition-colors">
+                <Upload className="h-4 w-4" />
+                {uploading ? 'Uploading...' : 'Upload File'}
+                <input type="file" className="hidden" onChange={handleFileUpload} disabled={uploading} />
+              </label>
+              {attachmentName && (
+                <span className="text-xs text-muted-foreground truncate flex-1">{attachmentName}</span>
+              )}
             </div>
           </div>
 
@@ -118,18 +130,18 @@ export function AnnouncementForm({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors"
+              className="px-4 py-2 text-sm font-medium rounded-lg border border-input hover:bg-muted transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={submitting || !title.trim()}
-              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors gap-2 disabled:opacity-50"
+              disabled={!title.trim() || isSubmitting}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              <Plus className="h-4 w-4" />
-              Publish
+              {isSubmitting ? (
+                <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Sending...</span>
+              ) : 'Send Announcement'}
             </button>
           </div>
         </form>

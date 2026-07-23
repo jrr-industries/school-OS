@@ -1,109 +1,178 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Loader2, MessageSquare, AlertCircle } from 'lucide-react';
-import { useMessages, useSendMessage, useMarkAsRead } from '../hooks/use-chat-messages';
-import { useChatRealtime } from '../hooks/use-chat-realtime';
-import { useTypingIndicator } from '../hooks/use-chat-typing';
+import { Loader2, MessageSquare, AlertCircle, ArrowDown } from 'lucide-react';
 import { ChatHeader } from './chat-header';
 import { ChatInput } from './chat-input';
 import { MessageBubble, DateSeparator } from './message-bubble';
 import { TypingIndicator } from './typing-indicator';
+import { MediaGallery } from './media-gallery';
+import { useChatStore } from '../store/chat-store';
 import type { Conversation, ChatMessage } from '../types';
+
+async function uploadFile(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch('/api/upload', { method: 'POST', body: formData });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error ?? 'Upload failed');
+  return json.data;
+}
 
 export function ChatWindow({
   conversation,
   currentUserId,
+  currentUserName,
   onBack,
-  isOnline,
+  onSendMessage,
+  onReact,
+  onEdit,
+  onDelete,
+  onForward,
+  onCopy,
+  onStar,
+  onTogglePin,
+  onToggleArchive,
+  onToggleMute,
+  onClearChat,
+  onDeleteChat,
+  onLoadMore,
+  hasMore,
+  isLoading,
+  messages,
 }: {
   conversation: Conversation;
   currentUserId: string | undefined;
+  currentUserName?: string;
   onBack: () => void;
-  isOnline: boolean;
+  onSendMessage: (content: string, opts?: { replyToId?: string; fileUrl?: string; fileName?: string; fileSize?: number; fileId?: string; messageType?: string }) => void;
+  onReact?: (messageId: string, emoji: string) => void;
+  onEdit?: (messageId: string, content: string) => void;
+  onDelete?: (messageId: string) => void;
+  onForward?: (message: ChatMessage) => void;
+  onCopy?: (content: string) => void;
+  onStar?: (messageId: string) => void;
+  onTogglePin?: () => void;
+  onToggleArchive?: () => void;
+  onToggleMute?: () => void;
+  onClearChat?: () => void;
+  onDeleteChat?: () => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoading?: boolean;
+  messages: ChatMessage[];
 }) {
-  const { data: messages, isLoading, error } = useMessages(conversation.id);
-  const sendMessage = useSendMessage();
-  const markAsRead = useMarkAsRead();
-  const { typingUsers, startTyping } = useTypingIndicator(conversation.id, currentUserId);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [showMediaGallery, setShowMediaGallery] = useState(false);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [initialScrollDone, setInitialScrollDone] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const typingUsers = useChatStore((s) => s.typingUsers[conversation.id] ?? []);
+  const onlineUsers = useChatStore((s) => s.onlineUsers);
 
-  useChatRealtime(conversation.id);
-
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = useCallback((smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
   }, []);
 
   useEffect(() => {
-    if (messages && messages.length > 0 && !initialScrollDone) {
-      scrollToBottom();
-      setInitialScrollDone(true);
-    }
-  }, [messages, initialScrollDone, scrollToBottom]);
-
-  useEffect(() => {
-    setInitialScrollDone(false);
-    markAsRead.mutate(conversation.id);
-    setReplyTo(null);
+    scrollToBottom(false);
   }, [conversation.id]);
 
-  const handleSend = useCallback((content: string) => {
-    sendMessage.mutate(
-      {
-        conversationId: conversation.id,
-        content,
-        replyToId: replyTo?.id,
-      },
-      {
-        onSuccess: () => {
-          setReplyTo(null);
-          setTimeout(scrollToBottom, 100);
-        },
-      },
-    );
-  }, [conversation.id, replyTo, sendMessage, scrollToBottom]);
+  useEffect(() => {
+    if (messages.length > 0) scrollToBottom(false);
+  }, [messages.length]);
 
-  const handleReply = useCallback((message: ChatMessage) => {
-    setReplyTo(message);
+  const handleScroll = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    setShowScrollBtn(!isNearBottom);
+    if (el.scrollTop < 50 && hasMore && onLoadMore) onLoadMore();
+  }, [hasMore, onLoadMore]);
+
+  const handleSend = useCallback((content: string) => {
+    if (editingMessage) {
+      onEdit?.(editingMessage.id, content);
+      setEditingMessage(null);
+      setEditContent('');
+    } else {
+      onSendMessage(content, { replyToId: replyTo?.id });
+      setReplyTo(null);
+    }
+  }, [replyTo, editingMessage, onSendMessage, onEdit]);
+
+  const handleSendFile = useCallback(async (file: File) => {
+    try {
+      const result = await uploadFile(file);
+      onSendMessage('', {
+        fileUrl: result.url,
+        fileName: result.name,
+        fileSize: result.size,
+        fileId: result.fileRecordId,
+        messageType: result.messageType,
+        replyToId: replyTo?.id,
+      });
+      setReplyTo(null);
+    } catch (err) {
+      console.error('Upload failed:', err);
+    }
+  }, [replyTo, onSendMessage]);
+
+  const handleStartEdit = useCallback((message: ChatMessage) => {
+    setEditingMessage(message);
+    setEditContent(message.content);
+    setReplyTo(null);
   }, []);
 
-  const getOtherParticipant = () => {
-    const other = conversation.participants.find((p) => p.userId !== currentUserId);
-    return other ?? conversation.participants[0] ?? null;
-  };
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessage(null);
+    setEditContent('');
+  }, []);
 
-  const participant = getOtherParticipant();
-  const typingNames = typingUsers
-    .filter((t) => t.userId !== currentUserId)
-    .map((t) => t.userName);
+  const otherParticipant = conversation.participants.find((p) => p.userId !== currentUserId) ?? conversation.participants[0] ?? null;
+  const isOnline = otherParticipant ? !!onlineUsers[otherParticipant.userId] : false;
+  const typingNames = typingUsers.filter((t) => t.userId !== currentUserId).map((t) => t.userName);
+
+  const mediaItems = messages
+    .filter((m) => m.messageType === 'image' || m.fileUrl)
+    .map((m) => ({
+      id: m.id,
+      type: m.messageType === 'image' ? 'image' as const : 'file' as const,
+      url: m.fileUrl ?? '',
+      name: m.fileName ?? 'File',
+      thumbnail: m.fileUrl ?? undefined,
+      createdAt: m.createdAt,
+    }));
 
   return (
     <div className="flex-1 flex flex-col">
       <ChatHeader
-        participant={participant}
+        participant={otherParticipant}
         isOnline={isOnline}
+        isMuted={conversation.isMuted}
+        isPinned={conversation.isPinned}
+        isArchived={conversation.isArchived}
         onBack={onBack}
+        onTogglePin={onTogglePin}
+        onToggleArchive={onToggleArchive}
+        onToggleMute={onToggleMute}
+        onDelete={onDeleteChat}
+        onSearch={() => {}}
+        onMediaGallery={() => setShowMediaGallery(true)}
       />
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 bg-muted/30">
+      <div
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-4 py-3 space-y-1 bg-muted/30 relative"
+      >
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <AlertCircle className="h-8 w-8 text-destructive" />
-            <p className="text-sm text-muted-foreground">{error instanceof Error ? error.message : 'Failed to load messages'}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="text-sm text-primary hover:underline"
-            >
-              Retry
-            </button>
-          </div>
-        ) : !messages || messages.length === 0 ? (
+        ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
               <MessageSquare className="h-8 w-8 text-primary" />
@@ -115,11 +184,17 @@ export function ChatWindow({
           </div>
         ) : (
           <>
+            {hasMore && (
+              <div className="flex justify-center py-2">
+                <button onClick={onLoadMore} className="text-xs text-primary hover:underline">
+                  Load older messages
+                </button>
+              </div>
+            )}
             {messages.map((msg, idx) => {
               const isMine = msg.senderId === currentUserId;
               const showAvatar = idx === 0 || messages[idx - 1]?.senderId !== msg.senderId;
               const showDateSeparator = idx === 0 || new Date(msg.createdAt).toDateString() !== new Date(messages[idx - 1].createdAt).toDateString();
-
               return (
                 <div key={msg.id}>
                   {showDateSeparator && <DateSeparator date={msg.createdAt} />}
@@ -127,41 +202,67 @@ export function ChatWindow({
                     message={msg}
                     isMine={isMine}
                     showAvatar={showAvatar}
-                    onReply={handleReply}
+                    onReply={(m) => { setReplyTo(m); setEditingMessage(null); }}
+                    onDelete={onDelete ? () => onDelete(msg.id) : undefined}
+                    onReact={onReact}
+                    onEdit={(m) => handleStartEdit(m)}
+                    onForward={onForward}
+                    onCopy={onCopy ? () => onCopy(msg.content) : undefined}
+                    onStar={onStar}
                   />
                 </div>
               );
             })}
-
             <TypingIndicator names={typingNames} />
             <div ref={messagesEndRef} />
           </>
         )}
+
+        {showScrollBtn && (
+          <button
+            onClick={() => scrollToBottom()}
+            className="absolute bottom-4 right-4 p-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      {replyTo && (
-        <div className="px-4 py-2 border-t bg-muted/50 flex items-center gap-2">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-muted-foreground">
-              Replying to {replyTo.sender.name}
-            </p>
-            <p className="text-xs text-muted-foreground/70 truncate">{replyTo.content}</p>
+      {editingMessage && (
+        <div className="px-4 py-2 border-t bg-muted/50">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-muted-foreground">Editing message</span>
+            <button onClick={handleCancelEdit} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
           </div>
-          <button
-            onClick={() => setReplyTo(null)}
-            className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors"
-          >
-            <span className="text-lg leading-none">&times;</span>
-          </button>
+          <input
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(editContent); }
+              if (e.key === 'Escape') handleCancelEdit();
+            }}
+            className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            autoFocus
+          />
         </div>
       )}
 
       <ChatInput
         onSend={handleSend}
-        onTyping={startTyping}
-        disabled={sendMessage.isPending}
-        placeholder={sendMessage.isPending ? 'Sending...' : 'Type a message...'}
+        onSendFile={handleSendFile}
+        onTyping={() => {}}
+        placeholder="Type a message..."
+        replyTo={replyTo ? { name: replyTo.sender.name, content: replyTo.content } : null}
+        onCancelReply={() => setReplyTo(null)}
       />
+
+      {showMediaGallery && (
+        <MediaGallery
+          items={mediaItems}
+          onClose={() => setShowMediaGallery(false)}
+          onImageClick={(url) => window.open(url, '_blank')}
+        />
+      )}
     </div>
   );
 }

@@ -178,6 +178,7 @@ export class ChatService {
         fileUrl: payload.fileUrl,
         fileName: payload.fileName,
         fileSize: payload.fileSize,
+        fileId: payload.fileId,
         replyToId: payload.replyToId,
       },
       include: messageInclude,
