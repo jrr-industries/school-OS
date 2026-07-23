@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDevSession } from '@/lib/dev-session';
+import { prisma } from '@schoolos/database';
 
 export async function GET() {
   if (process.env.NODE_ENV !== 'development') {
@@ -19,10 +20,15 @@ export async function GET() {
       );
     }
 
+    const user = await prisma.user.findUnique({
+      where: { email: session.email },
+      select: { id: true },
+    });
+
     return NextResponse.json({
       success: true,
       data: {
-        id: session.id,
+        id: user?.id ?? session.id,
         email: session.email,
         name: session.name,
         role: session.role,

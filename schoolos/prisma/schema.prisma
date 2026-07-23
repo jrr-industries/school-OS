@@ -176,6 +176,27 @@ enum PromotionStatus {
   skipped
 }
 
+enum MessageType {
+  text
+  image
+  pdf
+  document
+  voice
+  system
+}
+
+enum AnnouncementTarget {
+  all_schools
+  specific_school
+  multiple_schools
+}
+
+enum AnnouncementStatus {
+  draft
+  published
+  archived
+}
+
 enum DocumentCategory {
   birth_certificate
   transfer_certificate
@@ -251,6 +272,7 @@ model School {
   students        Student[]
   parents         Parent[]
   chatConversations ChatConversation[]
+  announcements     Announcement[]
 
   createdBy String? @map("created_by") @db.Uuid
   updatedBy String? @map("updated_by") @db.Uuid
@@ -341,6 +363,8 @@ model User {
   employee      Employee?
   chatParticipants ChatConversationParticipant[]
   chatMessages     ChatMessage[]
+  messageReads     MessageRead[]
+  announcements    Announcement[]
 
   @@index([schoolId])
   @@index([email])
@@ -547,6 +571,8 @@ model ChatConversation {
   schoolId  String   @map("school_id") @db.Uuid
   title     String?  @db.VarChar(200)
   isGroup   Boolean  @default(false) @map("is_group")
+  isPinned  Boolean  @default(false) @map("is_pinned")
+  isArchived Boolean @default(false) @map("is_archived")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
@@ -555,6 +581,7 @@ model ChatConversation {
   school       School                       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   participants ChatConversationParticipant[]
   messages     ChatMessage[]
+  readReceipts MessageRead[]
 
   @@index([schoolId])
   @@index([updatedAt])
@@ -582,20 +609,68 @@ model ChatMessage {
   conversationId String      @map("conversation_id") @db.Uuid
   senderId       String      @map("sender_id") @db.Uuid
   content        String      @db.Text
+  messageType    MessageType @default(text) @map("message_type")
+  fileUrl        String?     @map("file_url") @db.Text
+  fileName       String?     @map("file_name") @db.VarChar(255)
+  fileSize       Int?        @map("file_size")
   replyToId      String?     @map("reply_to_id") @db.Uuid
   editedAt       DateTime?   @map("edited_at")
   deletedAt      DateTime?   @map("deleted_at")
   createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
   version        Int         @default(1) @map("version")
 
   conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User             @relation(fields: [senderId], references: [id])
   replyTo      ChatMessage?     @relation("MessageReply", fields: [replyToId], references: [id])
   replies      ChatMessage[]    @relation("MessageReply")
+  readReceipts MessageRead[]
 
   @@index([conversationId, createdAt])
   @@index([senderId])
   @@map("chat_messages")
+}
+
+model MessageRead {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  readAt    DateTime @default(now()) @map("read_at")
+
+  message    ChatMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id])
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String @map("conversation_id") @db.Uuid
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+  @@index([conversationId])
+  @@map("message_reads")
+}
+
+model Announcement {
+  id              String             @id @default(uuid()) @db.Uuid
+  schoolId        String?            @map("school_id") @db.Uuid
+  title           String             @db.VarChar(200)
+  content         String?            @db.Text
+  target          AnnouncementTarget @default(all_schools) @map("target")
+  targetSchoolIds Json?              @default("[]") @map("target_school_ids")
+  status          AnnouncementStatus @default(published) @map("status")
+  priority        String             @default("normal") @db.VarChar(20)
+  createdById     String             @map("created_by_id") @db.Uuid
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  deletedAt       DateTime?          @map("deleted_at")
+  version         Int                @default(1) @map("version")
+
+  school School? @relation(fields: [schoolId], references: [id])
+  createdBy User  @relation(fields: [createdById], references: [id])
+
+  @@index([schoolId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("announcements")
 }
 
 model Setting {

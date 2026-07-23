@@ -87,6 +87,7 @@ const navSections: NavSection[] = [
     title: 'Communication',
     icon: MessageSquare,
     items: [
+      { label: 'Chat', href: '/school-admin/communication/chat', icon: MessageSquare },
       { label: 'Announcements', href: '/school-admin/announcements', icon: Bell },
       { label: 'Broadcast', href: '/school-admin/communication', icon: MessageSquare },
     ],
