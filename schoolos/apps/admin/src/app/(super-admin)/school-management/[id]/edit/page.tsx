@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { ArrowLeft, Loader2, Building2 } from 'lucide-react';
-import { createClientSupabaseClient } from '@schoolos/auth/client';
 import {
   Card,
   CardHeader,
@@ -67,14 +66,10 @@ export default function EditSchoolPage({ params }: { params: Promise<{ id: strin
     const fetchSchool = async () => {
       setLoading(true);
       try {
-        const supabase = createClientSupabaseClient();
-        const { data, error: fetchError } = await supabase
-          .from('School')
-          .select('*')
-          .eq('id', resolvedId)
-          .single();
-        if (fetchError) throw new Error(fetchError.message);
-        if (!data) throw new Error('School not found');
+        const res = await fetch(`/api/admin/schools/${resolvedId}`);
+        const body = await res.json();
+        if (!body.success) throw new Error(body.error || 'Failed to fetch school');
+        const data = body.data;
         setForm({
           schoolName: data.name || '',
           schoolCode: data.code || '',

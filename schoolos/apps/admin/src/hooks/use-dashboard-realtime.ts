@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { SupabaseRealtime } from '@/lib/supabase-realtime';
+import { getDashboardData } from '@/lib/api-client';
+import type { DashboardData } from '@/lib/api-client';
 
 interface DashboardMetrics {
   totalSchools: number;
@@ -36,27 +37,18 @@ export function useDashboardMetrics(): DashboardMetrics & { loading: boolean } {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [
-        totalSchools, activeSchools, trialSchools,
-        totalStudents, totalTeachers, totalParents, totalStaff,
-        totalUsers, activeSubscriptions, revenue,
-      ] = await Promise.all([
-        SupabaseRealtime.getAggregateCount('School'),
-        SupabaseRealtime.getAggregateCount('School', { status: 'active' }),
-        SupabaseRealtime.getAggregateCount('School', { status: 'trial' }),
-        SupabaseRealtime.getAggregateCount('Student'),
-        SupabaseRealtime.getAggregateCount('Employee', { isTeaching: true }),
-        SupabaseRealtime.getAggregateCount('Parent'),
-        SupabaseRealtime.getAggregateCount('Employee', { isTeaching: false }),
-        SupabaseRealtime.getAggregateCount('User'),
-        SupabaseRealtime.getAggregateCount('Subscription', { status: 'active' }),
-        SupabaseRealtime.getAggregateSum('Subscription', 'amount'),
-      ]);
-
+      const data = await getDashboardData();
       setMetrics({
-        totalSchools, activeSchools, trialSchools,
-        totalStudents, totalTeachers, totalParents, totalStaff,
-        totalUsers, activeSubscriptions, revenue,
+        totalSchools: data.totalSchools,
+        activeSchools: data.activeSchools,
+        trialSchools: data.trialSchools,
+        totalStudents: data.totalStudents,
+        totalTeachers: data.totalTeachers,
+        totalParents: data.totalParents,
+        totalStaff: data.totalStaff,
+        totalUsers: data.totalUsers,
+        activeSubscriptions: data.activeSubscriptions,
+        revenue: data.revenue,
       });
     } catch (err) {
       console.error('Dashboard metrics fetch error:', err);
@@ -67,17 +59,8 @@ export function useDashboardMetrics(): DashboardMetrics & { loading: boolean } {
 
   useEffect(() => {
     fetchAll();
-
-    const unsubSchool = SupabaseRealtime.subscribe({ table: 'School', event: '*' }, fetchAll);
-    const unsubStudent = SupabaseRealtime.subscribe({ table: 'Student', event: '*' }, fetchAll);
-    const unsubEmployee = SupabaseRealtime.subscribe({ table: 'Employee', event: '*' }, fetchAll);
-    const unsubUser = SupabaseRealtime.subscribe({ table: 'User', event: '*' }, fetchAll);
-    const unsubSubscription = SupabaseRealtime.subscribe({ table: 'Subscription', event: '*' }, fetchAll);
-
-    return () => {
-      unsubSchool(); unsubStudent(); unsubEmployee();
-      unsubUser(); unsubSubscription();
-    };
+    const interval = setInterval(fetchAll, 30000);
+    return () => clearInterval(interval);
   }, [fetchAll]);
 
   return { ...metrics, loading };
@@ -89,8 +72,8 @@ export function useRecentSchools(): { schools: RecentSchool[]; loading: boolean 
 
   const fetch = useCallback(async () => {
     try {
-      const data = await SupabaseRealtime.getRecentRows<RecentSchool>('School', 5, 'createdAt');
-      setSchools(data);
+      const data = await getDashboardData();
+      setSchools(data.recentSchools);
     } catch (err) {
       console.error('Recent schools fetch error:', err);
     } finally {
@@ -100,8 +83,8 @@ export function useRecentSchools(): { schools: RecentSchool[]; loading: boolean 
 
   useEffect(() => {
     fetch();
-    const unsub = SupabaseRealtime.subscribe({ table: 'School', event: 'INSERT' }, fetch);
-    return () => unsub();
+    const interval = setInterval(fetch, 30000);
+    return () => clearInterval(interval);
   }, [fetch]);
 
   return { schools, loading };
@@ -113,8 +96,12 @@ export function useSchoolStatusDistribution(): { data: Record<string, number>; l
 
   const fetch = useCallback(async () => {
     try {
-      const counts = await SupabaseRealtime.getCountByGroup('School', 'status');
-      setData(counts);
+      const dashboard = await getDashboardData();
+      const statusMap: Record<string, number> = {};
+      for (const item of dashboard.schoolsByStatus) {
+        statusMap[item.status] = item.count;
+      }
+      setData(statusMap);
     } catch (err) {
       console.error('Status distribution fetch error:', err);
     } finally {
@@ -124,8 +111,8 @@ export function useSchoolStatusDistribution(): { data: Record<string, number>; l
 
   useEffect(() => {
     fetch();
-    const unsub = SupabaseRealtime.subscribe({ table: 'School', event: '*' }, fetch);
-    return () => unsub();
+    const interval = setInterval(fetch, 30000);
+    return () => clearInterval(interval);
   }, [fetch]);
 
   return { data, loading };
@@ -142,23 +129,9 @@ export function useSubscriptionMetrics(): {
 
   const fetch = useCallback(async () => {
     try {
-      const [plans, expired] = await Promise.all([
-        SupabaseRealtime.getCountByGroup('Subscription', 'planId'),
-        SupabaseRealtime.getAggregateCount('Subscription', {
-          status: 'active',
-        }),
-      ]);
-      setPlanDistribution(plans);
-
-      const supabase = (await import('@schoolos/auth/client')).createClientSupabaseClient();
-      const thirtyDays = new Date();
-      thirtyDays.setDate(thirtyDays.getDate() + 30);
-      const { count } = await supabase
-        .from('Subscription')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active')
-        .lte('endDate', thirtyDays.toISOString());
-      setExpiringSoon(count ?? 0);
+      const data = await getDashboardData();
+      setPlanDistribution(data.planDistribution);
+      setExpiringSoon(data.expiringSoon);
     } catch (err) {
       console.error('Subscription metrics fetch error:', err);
     } finally {
@@ -168,8 +141,8 @@ export function useSubscriptionMetrics(): {
 
   useEffect(() => {
     fetch();
-    const unsub = SupabaseRealtime.subscribe({ table: 'Subscription', event: '*' }, fetch);
-    return () => unsub();
+    const interval = setInterval(fetch, 30000);
+    return () => clearInterval(interval);
   }, [fetch]);
 
   return { planDistribution, expiringSoon, loading };

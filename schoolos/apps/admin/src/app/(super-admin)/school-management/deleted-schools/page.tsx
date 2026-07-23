@@ -13,7 +13,6 @@ import {
   School,
   ArchiveRestore,
 } from 'lucide-react';
-import { createClientSupabaseClient } from '@schoolos/auth/client';
 import {
   Card,
   CardHeader,
@@ -56,22 +55,17 @@ export default function DeletedSchoolsPage() {
     setLoading(true);
     setError(null);
     try {
-      const supabase = createClientSupabaseClient();
-      let query = supabase
-        .from('School')
-        .select('*', { count: 'exact' })
-        .not('deletedAt', 'is', null)
-        .order('deletedAt', { ascending: false })
-        .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1);
-
-      if (search.trim()) {
-        query = query.ilike('name', `%${search.trim()}%`);
-      }
-
-      const { data, count, error: fetchError } = await query;
-      if (fetchError) throw new Error(fetchError.message);
-      setSchools((data ?? []) as SchoolRecord[]);
-      setTotal(count ?? 0);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(ITEMS_PER_PAGE),
+        deleted: 'true',
+        ...(search.trim() && { search: search.trim() }),
+      });
+      const res = await fetch(`/api/admin/schools?${params}`);
+      const body = await res.json();
+      if (!body.success) throw new Error(body.error || 'Failed to fetch schools');
+      setSchools(body.data);
+      setTotal(body.meta.total);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch deleted schools');
     } finally {

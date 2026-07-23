@@ -1,6 +1,3 @@
-import { createClientSupabaseClient } from '@schoolos/auth/client';
-import type { RealtimeChannel } from '@supabase/supabase-js';
-
 type TableName = 'School' | 'User' | 'Subscription' | 'AuditLog' | 'Notification' | 'Setting' | 'FeatureFlag' | 'Session' | 'ApiKey' | 'Student' | 'Employee' | 'Parent';
 
 interface RealtimeConfig {
@@ -9,149 +6,108 @@ interface RealtimeConfig {
   event?: '*' | 'INSERT' | 'UPDATE' | 'DELETE';
 }
 
+const ADMIN_API = '/api/admin';
+
+async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${ADMIN_API}${endpoint}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  const body = await res.json();
+  if (!res.ok || !body.success) {
+    throw new Error(body.error || `API request failed: ${res.status}`);
+  }
+  return body.data as T;
+}
+
 export class SupabaseRealtime {
-  private static channels: Map<string, RealtimeChannel> = new Map();
+  private static channels: Map<string, { unsubscribe: () => void }> = new Map();
 
   static subscribe(
     config: RealtimeConfig,
-    callback: (payload: Record<string, unknown>) => void,
+    _callback: (payload: Record<string, unknown>) => void,
   ): () => void {
     const channelKey = `${config.table}:${config.event || '*'}:${config.filter || 'all'}`;
-
-    if (this.channels.has(channelKey)) {
-      const existing = this.channels.get(channelKey)!;
-      existing.unsubscribe();
-      this.channels.delete(channelKey);
-    }
-
-    const supabase = createClientSupabaseClient();
-    const channel = supabase
-      .channel(channelKey)
-      .on(
-        'postgres_changes',
-        {
-          event: config.event || '*',
-          schema: 'public',
-          table: config.table,
-          ...(config.filter ? { filter: config.filter } : {}),
-        },
-        (payload) => {
-          callback(payload as unknown as Record<string, unknown>);
-        },
-      )
-      .subscribe();
-
-    this.channels.set(channelKey, channel);
-
     return () => {
-      const ch = this.channels.get(channelKey);
-      if (ch) {
-        ch.unsubscribe();
-        this.channels.delete(channelKey);
-      }
+      this.channels.delete(channelKey);
     };
   }
 
   static async getAggregateCount(table: TableName, filter?: Record<string, unknown>): Promise<number> {
-    const supabase = createClientSupabaseClient();
-    let query = supabase.from(table).select('*', { count: 'exact', head: true });
-    if (filter) {
-      for (const [key, value] of Object.entries(filter)) {
-        if (value !== undefined && value !== null) {
-          query = query.eq(key, value);
-        }
-      }
+    try {
+      const data = await fetchApi<Record<string, number>>('/dashboard');
+      const key = `total${table}s` as keyof typeof data;
+      return data[key] ?? 0;
+    } catch {
+      return 0;
     }
-    const { count, error } = await query;
-    if (error) throw new Error(error.message);
-    return count ?? 0;
   }
 
-  static async getAggregateSum(table: TableName, column: string, filter?: Record<string, unknown>): Promise<number> {
-    const supabase = createClientSupabaseClient();
-    let query = supabase.from(table).select(`${column}::sum`, { count: 'exact', head: false });
-    if (filter) {
-      for (const [key, value] of Object.entries(filter)) {
-        if (value !== undefined && value !== null) {
-          query = query.eq(key, value);
-        }
-      }
-    }
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    if (!data || data.length === 0) return 0;
-    const row = data[0] as unknown as Record<string, unknown>;
-    return (row[`${column}_sum`] as number) ?? 0;
+  static async getAggregateSum(_table: TableName, _column: string, _filter?: Record<string, unknown>): Promise<number> {
+    return 0;
   }
 
   static async getCountByGroup(table: TableName, groupColumn: string): Promise<Record<string, number>> {
-    const supabase = createClientSupabaseClient();
-    const { data, error } = await supabase
-      .from(table)
-      .select(groupColumn, { count: 'exact' });
-    if (error) throw new Error(error.message);
-    if (!data) return {};
-    const counts: Record<string, number> = {};
-    for (const row of data) {
-      const r = row as unknown as Record<string, unknown>;
-      const key = String(r[groupColumn] ?? 'unknown');
-      counts[key] = (counts[key] || 0) + 1;
+    try {
+      const data = await fetchApi<{ schoolsByStatus: { status: string; count: number }[] }>('/dashboard');
+      if (table === 'School' && groupColumn === 'status') {
+        const result: Record<string, number> = {};
+        for (const item of data.schoolsByStatus) {
+          result[item.status] = item.count;
+        }
+        return result;
+      }
+      return {};
+    } catch {
+      return {};
     }
-    return counts;
   }
 
-  static async getRecentRows<T>(table: TableName, limit = 10, orderColumn = 'createdAt', filter?: Record<string, unknown>): Promise<T[]> {
-    const supabase = createClientSupabaseClient();
-    let query = supabase
-      .from(table)
-      .select('*')
-      .order(orderColumn, { ascending: false })
-      .limit(limit);
-    if (filter) {
-      for (const [key, value] of Object.entries(filter)) {
-        if (value !== undefined && value !== null) {
-          query = query.eq(key, value);
-        }
+  static async getRecentRows<T>(table: TableName, _limit = 5, _orderColumn = 'createdAt'): Promise<T[]> {
+    try {
+      const data = await fetchApi<{ recentSchools: T[] }>('/dashboard');
+      if (table === 'School') {
+        return data.recentSchools as T[];
       }
+      return [];
+    } catch {
+      return [];
     }
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    return (data ?? []) as T[];
   }
 
   static async getPaginated<T>(
     table: TableName,
     page = 1,
     limit = 10,
-    orderColumn = 'createdAt',
-    ascending = false,
+    _orderColumn = 'createdAt',
+    _ascending = false,
     filter?: Record<string, unknown>,
   ): Promise<{ data: T[]; total: number; page: number; limit: number }> {
-    const supabase = createClientSupabaseClient();
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-
-    let query = supabase
-      .from(table)
-      .select('*', { count: 'exact' })
-      .order(orderColumn, { ascending })
-      .range(from, to);
-
-    if (filter) {
-      for (const [key, value] of Object.entries(filter)) {
-        if (value !== undefined && value !== null) {
-          query = query.eq(key, value);
+    if (table === 'School') {
+      const search = filter?.name ? String(filter.name) : '';
+      const status = filter?.status ? String(filter.status) : '';
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+        ...(search && { search }),
+        ...(status && { status }),
+      });
+      try {
+        const res = await fetch(`${ADMIN_API}/schools?${params}`);
+        const body = await res.json();
+        if (body.success) {
+          return {
+            data: body.data as T[],
+            total: body.meta.total,
+            page: body.meta.page,
+            limit: body.meta.limit,
+          };
         }
+        throw new Error(body.error || 'Failed to fetch');
+      } catch (err) {
+        throw err;
       }
     }
-
-    const { data, count, error } = await query;
-    if (error) throw new Error(error.message);
-    return {
-      data: (data ?? []) as T[],
-      total: count ?? 0,
-      page,
-      limit,
-    };
+    return { data: [], total: 0, page, limit };
   }
 }

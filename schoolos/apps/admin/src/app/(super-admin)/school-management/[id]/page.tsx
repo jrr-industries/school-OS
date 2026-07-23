@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
@@ -24,8 +23,6 @@ import {
   Loader2,
   School,
 } from 'lucide-react';
-import { createClientSupabaseClient } from '@schoolos/auth/client';
-import { SupabaseRealtime } from '@/lib/supabase-realtime';
 import {
   Card,
   CardHeader,
@@ -33,12 +30,6 @@ import {
   CardContent,
   Badge,
   Button,
-  Input,
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
   cn,
 } from '@schoolos/ui';
 
@@ -90,7 +81,7 @@ function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: strin
       <div className="mt-0.5 text-muted-foreground">{icon}</div>
       <div>
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-        <p className="text-sm">{value || '—'}</p>
+        <p className="text-sm">{value || '\u2014'}</p>
       </div>
     </div>
   );
@@ -112,17 +103,10 @@ export default function SchoolDetailPage({ params }: { params: Promise<{ id: str
     setLoading(true);
     setError(null);
     try {
-      const supabase = createClientSupabaseClient();
-      const { data, error: fetchError } = await supabase
-        .from('School')
-        .select('*')
-        .eq('id', resolvedId)
-        .single();
-
-      if (fetchError) throw new Error(fetchError.message);
-      if (!data) throw new Error('School not found');
-
-      setSchool(data as unknown as SchoolDetail);
+      const res = await fetch(`/api/admin/schools/${resolvedId}`);
+      const body = await res.json();
+      if (!body.success) throw new Error(body.error || 'Failed to fetch school');
+      setSchool(body.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load school');
     } finally {
@@ -136,11 +120,8 @@ export default function SchoolDetailPage({ params }: { params: Promise<{ id: str
 
   useEffect(() => {
     if (!resolvedId) return;
-    const unsubscribe = SupabaseRealtime.subscribe(
-      { table: 'School', event: '*', filter: `id=eq.${resolvedId}` },
-      fetchSchool,
-    );
-    return unsubscribe;
+    const interval = setInterval(fetchSchool, 30000);
+    return () => clearInterval(interval);
   }, [resolvedId, fetchSchool]);
 
   const handleSuspendToggle = async () => {
@@ -249,7 +230,7 @@ export default function SchoolDetailPage({ params }: { params: Promise<{ id: str
               <Badge variant={badge.variant}>{badge.label}</Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              {school.code} &middot; {school.type}{school.board ? ` · ${school.board}` : ''}
+              {school.code} &middot; {school.type}{school.board ? ` \u00b7 ${school.board}` : ''}
             </p>
           </div>
         </div>
@@ -258,11 +239,7 @@ export default function SchoolDetailPage({ params }: { params: Promise<{ id: str
             <Pencil className="mr-2 h-4 w-4" />
             Edit
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSuspendToggle}
-          >
+          <Button variant="outline" size="sm" onClick={handleSuspendToggle}>
             {school.status === 'suspended' ? (
               <ShieldCheck className="mr-2 h-4 w-4 text-emerald-500" />
             ) : (
@@ -270,11 +247,7 @@ export default function SchoolDetailPage({ params }: { params: Promise<{ id: str
             )}
             {school.status === 'suspended' ? 'Activate' : 'Suspend'}
           </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleDelete}
-          >
+          <Button variant="destructive" size="sm" onClick={handleDelete}>
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
           </Button>
