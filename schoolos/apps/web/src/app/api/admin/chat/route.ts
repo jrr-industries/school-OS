@@ -4,7 +4,7 @@ import { getDevSession } from '@/lib/dev-session';
 import { getUserWithRoles } from '@/features/chat/permissions/get-user-roles';
 import { canMessage, canViewConversation } from '@/features/chat/permissions/chat-permissions';
 import { prisma } from '@schoolos/database';
-import { ChatService } from '@/features/chat/services/chat.service';
+import { ChatRepository } from '@schoolos/database/repositories/chat.repository';
 
 async function getAuthUser() {
   const session = await getDevSession();
@@ -12,16 +12,19 @@ async function getAuthUser() {
   return getUserWithRoles(session);
 }
 
+async function getConversationForAuth(id: string) {
+  return prisma.chatConversation.findUnique({
+    where: { id },
+    select: { id: true, schoolId: true, participants: { where: { leftAt: null }, select: { userId: true, leftAt: true } } },
+  });
+}
+
 export async function GET(request: NextRequest) {
   const session = await getDevSession();
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!session) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   const user = await getAuthUser();
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type') ?? 'conversations';
@@ -47,18 +50,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === 'messages' && conversationId) {
-      const conv = await prisma.chatConversation.findUnique({
-        where: { id: conversationId },
-        select: { id: true, schoolId: true, participants: { where: { leftAt: null }, select: { userId: true, leftAt: true } } },
-      });
-      if (!conv) {
-        return NextResponse.json({ success: false, error: 'Conversation not found' }, { status: 404 });
-      }
+      const conv = await getConversationForAuth(conversationId);
+      if (!conv) return NextResponse.json({ success: false, error: 'Conversation not found' }, { status: 404 });
       const viewCheck = canViewConversation(user, conv as any);
-      if (!viewCheck.allowed) {
-        return NextResponse.json({ success: false, error: viewCheck.reason }, { status: 403 });
-      }
-      const messages = await ChatService.getMessages(session, conversationId);
+      if (!viewCheck.allowed) return NextResponse.json({ success: false, error: viewCheck.reason }, { status: 403 });
+      const messages = await ChatRepository.getMessages(conversationId, undefined, 50);
       return NextResponse.json({ success: true, data: messages });
     }
 
@@ -71,14 +67,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const session = await getDevSession();
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!session) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   const user = await getAuthUser();
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   try {
     const body = await request.json();
@@ -86,42 +78,22 @@ export async function POST(request: NextRequest) {
 
     if (action === 'create-conversation') {
       const targetUser = await getUserWithRoles(body.participantId);
-      if (!targetUser) {
-        return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
-      }
-
-      const messageCheck = canMessage(user, targetUser);
-      if (!messageCheck.allowed) {
-        return NextResponse.json({ success: false, error: messageCheck.reason }, { status: 403 });
-      }
-
-      const conversation = await ChatService.createConversation(session, {
-        participantId: body.participantId,
-        title: body.title,
-      });
+      if (!targetUser) return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
+      const check = canMessage(user, targetUser);
+      if (!check.allowed) return NextResponse.json({ success: false, error: check.reason }, { status: 403 });
+      const schoolId = user.isSuperAdmin ? targetUser.schoolId : user.schoolId;
+      const conversation = await ChatRepository.findOrCreateConversation(schoolId, [user.id, body.participantId], body.title);
       return NextResponse.json({ success: true, data: conversation });
     }
 
-    const getConv = async (id: string) => {
-      const c = await prisma.chatConversation.findUnique({
-        where: { id },
-        select: { id: true, schoolId: true, participants: { where: { leftAt: null }, select: { userId: true, leftAt: true } } },
-      });
-      return c;
-    };
-
     if (action === 'send-message') {
-      const conv = await getConv(body.conversationId);
-      if (!conv) {
-        return NextResponse.json({ success: false, error: 'Conversation not found' }, { status: 404 });
-      }
+      const conv = await getConversationForAuth(body.conversationId);
+      if (!conv) return NextResponse.json({ success: false, error: 'Conversation not found' }, { status: 404 });
       const viewCheck = canViewConversation(user, conv as any);
-      if (!viewCheck.allowed) {
-        return NextResponse.json({ success: false, error: viewCheck.reason }, { status: 403 });
-      }
-
-      const message = await ChatService.sendMessage(session, {
+      if (!viewCheck.allowed) return NextResponse.json({ success: false, error: viewCheck.reason }, { status: 403 });
+      const message = await ChatRepository.sendMessage({
         conversationId: body.conversationId,
+        senderId: user.id,
         content: body.content,
         messageType: body.messageType,
         fileUrl: body.fileUrl,
@@ -134,16 +106,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'mark-read') {
-      const conv = await getConv(body.conversationId);
-      if (!conv) {
-        return NextResponse.json({ success: false, error: 'Conversation not found' }, { status: 404 });
-      }
+      const conv = await getConversationForAuth(body.conversationId);
+      if (!conv) return NextResponse.json({ success: false, error: 'Conversation not found' }, { status: 404 });
       const viewCheck = canViewConversation(user, conv as any);
-      if (!viewCheck.allowed) {
-        return NextResponse.json({ success: false, error: viewCheck.reason }, { status: 403 });
-      }
-
-      await ChatService.markAsRead(session, body.conversationId);
+      if (!viewCheck.allowed) return NextResponse.json({ success: false, error: viewCheck.reason }, { status: 403 });
+      await ChatRepository.markAsRead(body.conversationId, user.id);
       return NextResponse.json({ success: true });
     }
 

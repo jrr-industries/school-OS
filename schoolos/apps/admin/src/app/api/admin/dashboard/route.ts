@@ -85,6 +85,19 @@ export async function GET() {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch dashboard stats';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+
+    const isDbError =
+      message.includes('Can\'t reach database server') ||
+      message.includes('connect ECONNREFUSED') ||
+      message.includes('connection refused') ||
+      message.includes('getaddrinfo ENOTFOUND');
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: isDbError ? 'Database connection unavailable.' : message,
+      },
+      { status: 500 },
+    );
   }
 }

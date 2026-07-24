@@ -25,6 +25,7 @@ export function VoiceRecorder({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number>(0);
+  const finalDurationRef = useRef(0);
 
   const cleanup = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -63,7 +64,7 @@ export function VoiceRecorder({
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
         setAudioUrl(URL.createObjectURL(blob));
         setState('stopped');
-        setDuration(0);
+        finalDurationRef.current = duration;
         if (timerRef.current) clearInterval(timerRef.current);
         context.close();
       };
@@ -139,7 +140,8 @@ export function VoiceRecorder({
     if (chunksRef.current.length === 0) return;
     const blob = new Blob(chunksRef.current, { type: mediaRecorder.current?.mimeType ?? 'audio/webm' });
     setUploading(true);
-    onSend(blob, duration);
+    await onSend(blob, finalDurationRef.current || duration);
+    cleanup();
   };
 
   const handleCancel = () => {

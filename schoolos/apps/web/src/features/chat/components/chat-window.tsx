@@ -172,9 +172,9 @@ export function ChatWindow({
     setForwardMessage(message);
   }, []);
 
-  const otherParticipant = conversation.participants.find((p) => p.userId !== currentUserId) ?? conversation.participants[0] ?? null;
+  const otherParticipant = currentUserId ? (conversation.participants.find((p) => p.userId !== currentUserId) ?? conversation.participants[0] ?? null) : conversation.participants[0] ?? null;
   const isOnline = otherParticipant ? !!onlineUsers[otherParticipant.userId] : false;
-  const typingNames = typingUsers.filter((t) => t.userId !== currentUserId).map((t) => t.userName);
+  const typingNames = currentUserId ? typingUsers.filter((t) => t.userId !== currentUserId).map((t) => t.userName) : [];
 
   const mediaItems = messages
     .filter((m) => m.messageType === 'image' || m.fileUrl)
@@ -245,7 +245,7 @@ export function ChatWindow({
               </div>
             )}
             {messages.map((msg, idx) => {
-              const isMine = msg.senderId === currentUserId;
+              const isMine = !!currentUserId && msg.senderId === currentUserId;
               const showAvatar = idx === 0 || messages[idx - 1]?.senderId !== msg.senderId;
               const showDateSeparator = idx === 0 || new Date(msg.createdAt).toDateString() !== new Date(messages[idx - 1].createdAt).toDateString();
               return (

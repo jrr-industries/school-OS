@@ -63,6 +63,21 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
+async function ensureBucketExists(): Promise<void> {
+  const supabase = createSupabaseAdminClient();
+  const { data: buckets } = await supabase.storage.listBuckets();
+  const exists = buckets?.some((b) => b.name === CHAT_BUCKET);
+  if (!exists) {
+    const { error } = await supabase.storage.createBucket(CHAT_BUCKET, {
+      public: true,
+      fileSizeLimit: MAX_FILE_SIZE,
+    });
+    if (error && !error.message.includes('already exists')) {
+      throw new Error(`Failed to create storage bucket: ${error.message}`);
+    }
+  }
+}
+
 export class StorageService {
   static async uploadChatFile(
     file: File,
@@ -70,6 +85,7 @@ export class StorageService {
     schoolId: string,
   ): Promise<UploadedFile> {
     validateFile(file);
+    await ensureBucketExists();
 
     const supabase = createSupabaseAdminClient();
     const sanitized = sanitizeFileName(file.name);

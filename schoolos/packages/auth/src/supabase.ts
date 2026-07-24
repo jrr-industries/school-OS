@@ -68,6 +68,16 @@ export async function createServerSupabaseClient(
   });
 }
 
+let clientSupabaseInstance: SupabaseClient | null = null;
+
 export function createClientSupabaseClient(): SupabaseClient {
-  return createClient(getSupabaseUrl(), getSupabaseAnonKey());
+  if (clientSupabaseInstance) return clientSupabaseInstance;
+  clientSupabaseInstance = createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
+  });
+  return clientSupabaseInstance;
 }

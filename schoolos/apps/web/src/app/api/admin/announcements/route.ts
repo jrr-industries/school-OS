@@ -3,21 +3,17 @@ import type { NextRequest } from 'next/server';
 import { getDevSession } from '@/lib/dev-session';
 import { getUserWithRoles } from '@/features/chat/permissions/get-user-roles';
 import { isSameSchool } from '@/features/chat/permissions/chat-permissions';
-import { ChatService } from '@/features/chat/services/chat.service';
+import { ChatRepository } from '@schoolos/database/repositories/chat.repository';
 
 export async function GET() {
   const session = await getDevSession();
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!session) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   const user = await getUserWithRoles(session);
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const announcements = await ChatService.getAnnouncements(session);
+    const announcements = await ChatRepository.getAnnouncements(user.id, user.schoolId);
     const filtered = announcements.filter((a: any) => {
       if (user.isSuperAdmin) return true;
       return isSameSchool(user, a.schoolId);
@@ -31,14 +27,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const session = await getDevSession();
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!session) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   const user = await getUserWithRoles(session);
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
   if (!user.isSuperAdmin) {
     return NextResponse.json({ success: false, error: 'Only super admins can create announcements' }, { status: 403 });
@@ -46,12 +38,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const announcement = await ChatService.createAnnouncement(session, {
+    const announcement = await ChatRepository.createAnnouncement({
       title: body.title,
       content: body.content,
       target: body.target ?? 'all_schools',
       targetSchoolIds: body.targetSchoolIds,
       priority: body.priority,
+      createdById: user.id,
+      schoolId: user.schoolId,
     });
     return NextResponse.json({ success: true, data: announcement });
   } catch (error) {

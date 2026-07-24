@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Search, MessageSquare, School, Loader2, CheckCheck } from 'lucide-react';
 import { cn } from '@schoolos/ui';
 import { ChatHeader } from '@/features/chat/components/chat-header';
@@ -13,10 +13,11 @@ import {
   useMarkAsRead,
   useReactToMessage,
   useDeleteMessage,
+  useCreateConversation,
+  useSchoolAdmins,
 } from '@/features/chat/hooks/use-chat-queries';
-import { useConversationRealtime, usePresence, useTypingBroadcast, startTyping } from '@/features/chat/hooks/use-chat-realtime';
+import { useChatRealtime, initChatConnection, teardownChatConnection, emitTyping } from '@/features/chat/hooks/use-chat-realtime';
 import { useChatStore } from '@/features/chat/store/chat-store';
-import { createClientSupabaseClient } from '@schoolos/auth/client';
 import { toast } from 'sonner';
 import type { ChatMessage, Conversation } from '@/features/chat/types';
 
@@ -44,107 +45,76 @@ function formatTime(iso: string) {
 }
 
 export default function CommunicationChatPage() {
-  const [schoolAdmins, setSchoolAdmins] = useState<SchoolAdmin[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [activeAdmin, setActiveAdmin] = useState<SchoolAdmin | null>(null);
+  const [search, setSearch] = useState('');
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const { data: schoolAdmins, isLoading: loading } = useSchoolAdmins();
   const { data: messagesPages, fetchNextPage, hasNextPage, isLoading: msgsLoading } = useMessages(activeConvId);
   const sendMessage = useSendMessage();
   const markAsRead = useMarkAsRead();
   const reactToMessage = useReactToMessage();
   const deleteMessage = useDeleteMessage();
+  const createConversation = useCreateConversation();
+
   const onlineUsers = useChatStore((s) => s.onlineUsers);
+  const lastSeen = useChatStore((s) => s.lastSeen);
   const typingUsers = useChatStore((s) => s.typingUsers);
+  const setActiveConversation = useChatStore((s) => s.setActiveConversation);
+  const resetUnread = useChatStore((s) => s.resetUnread);
 
-  useConversationRealtime(activeConvId);
-  usePresence(activeConvId, currentUserId);
-  useTypingBroadcast(activeConvId, currentUserId);
+  // Single realtime pipeline (socket events)
+  useChatRealtime(activeConvId, currentUserId);
 
-  const fetchSchoolAdmins = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/admin/chat/school-admins');
-      const json = await res.json();
-      if (json.success) { setSchoolAdmins(json.data); }
-      else { toast.error(json.error ?? 'Failed to load school admins'); }
-    } catch { toast.error('Failed to load school admins'); }
-    finally { setLoading(false); }
-  }, []);
-
+  // Connect once
   useEffect(() => {
     (async () => {
-      try {
-        const meRes = await fetch('/api/admin/chat?type=me');
-        const meJson = await meRes.json();
-        if (meJson.success) setCurrentUserId(meJson.data.id);
-      } catch {}
-    })();
-    fetchSchoolAdmins();
-  }, [fetchSchoolAdmins]);
-
-  useEffect(() => {
-    if (!activeConvId) return;
-    const supabase = createClientSupabaseClient();
-    if (!supabase) return;
-    const channel = supabase.channel(`admin-sidebar-${activeConvId}`);
-    channel
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'chat_messages',
-        filter: `conversation_id=eq.${activeConvId}`,
-      }, () => { fetchSchoolAdmins(); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [activeConvId, fetchSchoolAdmins]);
-
-  useEffect(() => {
-    if (activeConvId) {
-      markAsRead.mutate(activeConvId);
-      setSchoolAdmins((prev) =>
-        prev.map((a) => (a.conversationId === activeConvId ? { ...a, unreadCount: 0 } : a))
-      );
-    }
-  }, [activeConvId]);
-
-  const filteredAdmins = useMemo(() => {
-    if (!search.trim()) return schoolAdmins;
-    const q = search.toLowerCase();
-    return schoolAdmins.filter(
-      (a) => a.school.name.toLowerCase().includes(q) || a.name.toLowerCase().includes(q),
-    );
-  }, [schoolAdmins, search]);
-
-  const handleSelect = useCallback(async (admin: SchoolAdmin) => {
-    try {
-      let convId = admin.conversationId;
-
-      if (!convId) {
-        const res = await fetch('/api/admin/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'create-conversation', participantId: admin.id }),
-        });
-        const json = await res.json();
-        if (!json.success) { toast.error(json.error ?? 'Failed to create conversation'); return; }
-        convId = json.data.id;
-        setSchoolAdmins((prev) =>
-          prev.map((a) => (a.id === admin.id ? { ...a, conversationId: convId } : a))
-        );
+      const info = await initChatConnection('/api/admin/chat/socket-token');
+      if (info) {
+        setCurrentUserId(info.userId);
+        console.log('[chat] Connected as:', info.userId);
       }
-
-      setActiveAdmin(admin);
-      setActiveConvId(convId);
-    } catch { toast.error('Failed to open conversation'); }
+    })();
+    return () => { teardownChatConnection(); };
   }, []);
 
-  const handleSendMessage = useCallback((content: string, opts?: { replyToId?: string; fileUrl?: string; fileName?: string; fileSize?: number; fileId?: string; messageType?: string }) => {
+  // Don't render messages until currentUserId is set (prevents alignment bugs)
+  const isReady = !!currentUserId;
+
+  // Mark active conversation read + reset unread optimistically
+  useEffect(() => {
+    if (!activeConvId) return;
+    setActiveConversation(activeConvId);
+    resetUnread(activeConvId);
+    markAsRead.mutate(activeConvId);
+  }, [activeConvId, markAsRead, resetUnread, setActiveConversation]);
+
+  const handleSelect = useCallback(async (admin: SchoolAdmin) => {
+    let convId = admin.conversationId;
+    if (!convId) {
+      const result = await createConversation.mutateAsync(admin.id);
+      if (!result.success) {
+        toast.error(result.error ?? 'Failed to create conversation');
+        return;
+      }
+      convId = (result.data as unknown as Conversation).id;
+    }
+    setActiveAdmin(admin);
+    setActiveConvId(convId);
+    setReplyTo(null);
+  }, [createConversation]);
+
+  const handleSendMessage = useCallback((content: string, opts?: {
+    replyToId?: string; fileUrl?: string; fileName?: string; fileSize?: number; fileId?: string; messageType?: string;
+  }) => {
     if (!activeConvId) return;
     sendMessage.mutate({
       conversationId: activeConvId,
       content,
-      replyToId: opts?.replyToId,
+      replyToId: opts?.replyToId ?? (replyTo?.id),
       fileUrl: opts?.fileUrl,
       fileName: opts?.fileName,
       fileSize: opts?.fileSize,
@@ -153,9 +123,26 @@ export default function CommunicationChatPage() {
     }, {
       onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed to send message'),
     });
-  }, [activeConvId, sendMessage]);
+    setReplyTo(null);
+  }, [activeConvId, sendMessage, replyTo]);
 
-  const messages: ChatMessage[] = messagesPages?.pages.flatMap((p) => p.messages) ?? [];
+  const messagesDesc: ChatMessage[] = messagesPages?.pages.flatMap((p) => p.messages) ?? [];
+  // Render oldest -> newest (cache is newest-first)
+  const messages = useMemo(() => [...messagesDesc].reverse(), [messagesDesc]);
+
+  // Auto-scroll to bottom when messages arrive or conversation changes
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+  }, [activeConvId, messages.length, messages[messages.length - 1]?.id]);
+
+  const adminsList = (schoolAdmins as SchoolAdmin[] | undefined) ?? [];
+  const filteredAdmins = useMemo(() => {
+    if (!search.trim()) return adminsList;
+    const q = search.toLowerCase();
+    return adminsList.filter(
+      (a) => a.school.name.toLowerCase().includes(q) || a.name.toLowerCase().includes(q),
+    );
+  }, [adminsList, search]);
 
   const conversation = useMemo((): Conversation | null => {
     if (!activeAdmin || !activeConvId) return null;
@@ -179,13 +166,7 @@ export default function CommunicationChatPage() {
         lastReadAt: null,
         joinedAt: new Date().toISOString(),
         leftAt: null,
-        user: {
-          id: activeAdmin.id,
-          name: activeAdmin.name,
-          email: activeAdmin.email,
-          avatar: activeAdmin.avatar,
-          isSuperAdmin: false,
-        },
+        user: { id: activeAdmin.id, name: activeAdmin.name, email: activeAdmin.email, avatar: activeAdmin.avatar, isSuperAdmin: false },
       }],
       messages: [],
       unreadCount: 0,
@@ -194,10 +175,11 @@ export default function CommunicationChatPage() {
 
   const otherParticipant = conversation?.participants[0] ?? null;
   const isOnline = activeAdmin ? !!onlineUsers[activeAdmin.id] : false;
+  const activeLastSeen = activeAdmin ? lastSeen[activeAdmin.id] ?? null : null;
 
-  const typingNames = activeConvId
-    ? (typingUsers[activeConvId] ?? []).filter((t) => t.userId !== currentUserId).map((t) => t.userName)
-    : [];
+  const typingNames = (typingUsers[activeConvId ?? ''] ?? [])
+    .filter((t) => t.userId !== currentUserId)
+    .map((t) => t.userName);
 
   return (
     <div className="h-[calc(100vh-7rem)] flex rounded-xl border bg-background overflow-hidden shadow-sm">
@@ -206,7 +188,7 @@ export default function CommunicationChatPage() {
         <div className="p-4 border-b">
           <h1 className="text-lg font-semibold tracking-tight">School Admins</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {schoolAdmins.length} {schoolAdmins.length === 1 ? 'admin' : 'admins'}
+            {adminsList.length} {adminsList.length === 1 ? 'admin' : 'admins'}
           </p>
           <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -301,11 +283,17 @@ export default function CommunicationChatPage() {
             <ChatHeader
               participant={otherParticipant}
               isOnline={isOnline}
-              onBack={() => { setActiveConvId(null); setActiveAdmin(null); }}
+              lastSeen={activeLastSeen}
+              onBack={() => { setActiveConvId(null); setActiveAdmin(null); setActiveConversation(null); }}
             />
 
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 bg-muted/30 relative">
-              {msgsLoading ? (
+              {!isReady ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-sm text-muted-foreground">Connecting to chat...</span>
+                </div>
+              ) : msgsLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
@@ -315,9 +303,7 @@ export default function CommunicationChatPage() {
                     <MessageSquare className="h-8 w-8 text-primary" />
                   </div>
                   <h3 className="text-lg font-medium">{activeAdmin.school.name}</h3>
-                  <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                    Chat with {activeAdmin.name}
-                  </p>
+                  <p className="text-sm text-muted-foreground mt-1 max-w-sm">Chat with {activeAdmin.name}</p>
                 </div>
               ) : (
                 <>
@@ -329,7 +315,7 @@ export default function CommunicationChatPage() {
                     </div>
                   )}
                   {messages.map((msg, idx) => {
-                    const isMine = msg.senderId === currentUserId;
+                    const isMine = !!currentUserId && msg.senderId === currentUserId;
                     const showAvatar = idx === 0 || messages[idx - 1]?.senderId !== msg.senderId;
                     const showDateSep = idx === 0 || new Date(msg.createdAt).toDateString() !== new Date(messages[idx - 1].createdAt).toDateString();
                     return (
@@ -339,21 +325,24 @@ export default function CommunicationChatPage() {
                           message={msg}
                           isMine={isMine}
                           showAvatar={showAvatar}
-                          onReply={() => {}}
-                          onDelete={(id: string) => deleteMessage.mutate({ messageId: id, forEveryone: true })}
-                          onReact={(messageId: string, emoji: string) => reactToMessage.mutate({ messageId, emoji })}
-                          onCopy={(content: string) => navigator.clipboard.writeText(content)}
+                          onReply={(m) => setReplyTo(m)}
+                          onDelete={(id) => deleteMessage.mutate({ messageId: id, forEveryone: true, conversationId: activeConvId! })}
+                          onReact={(messageId, emoji) => reactToMessage.mutate({ conversationId: activeConvId!, messageId, emoji })}
+                          onCopy={(content) => navigator.clipboard.writeText(content)}
                         />
                       </div>
                     );
                   })}
                   <TypingIndicator names={typingNames} />
+                  <div ref={messagesEndRef} />
                 </>
               )}
             </div>
 
             <ChatInput
               onSend={(content: string) => handleSendMessage(content)}
+              replyTo={replyTo ? { name: replyTo.sender.name, content: replyTo.content } : null}
+              onCancelReply={() => setReplyTo(null)}
               onSendFile={async (file: File) => {
                 try {
                   const fd = new FormData();
@@ -362,18 +351,13 @@ export default function CommunicationChatPage() {
                   const json = await res.json();
                   if (json.success) {
                     handleSendMessage('', {
-                      fileUrl: json.data.url,
-                      fileName: json.data.name,
-                      fileSize: json.data.size,
-                      fileId: json.data.fileRecordId,
-                      messageType: json.data.messageType,
+                      fileUrl: json.data.url, fileName: json.data.name, fileSize: json.data.size,
+                      fileId: json.data.fileRecordId, messageType: json.data.messageType,
                     });
-                  } else {
-                    toast.error(json.error ?? 'Upload failed');
-                  }
+                  } else { toast.error(json.error ?? 'Upload failed'); }
                 } catch { toast.error('Upload failed'); }
               }}
-              onSendVoice={async (blob: Blob, _duration?: number) => {
+              onSendVoice={async (blob: Blob) => {
                 try {
                   const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
                   const fd = new FormData();
@@ -382,22 +366,13 @@ export default function CommunicationChatPage() {
                   const json = await res.json();
                   if (json.success) {
                     handleSendMessage('', {
-                      fileUrl: json.data.url,
-                      fileName: json.data.name,
-                      fileSize: json.data.size,
-                      fileId: json.data.fileRecordId,
-                      messageType: 'voice',
+                      fileUrl: json.data.url, fileName: json.data.name, fileSize: json.data.size,
+                      fileId: json.data.fileRecordId, messageType: 'voice',
                     });
-                  } else {
-                    toast.error(json.error ?? 'Voice upload failed');
-                  }
+                  } else { toast.error(json.error ?? 'Voice upload failed'); }
                 } catch { toast.error('Voice upload failed'); }
               }}
-              onTyping={() => {
-                if (activeConvId && currentUserId) {
-                  startTyping(activeConvId, currentUserId, 'Super Admin');
-                }
-              }}
+              onTyping={() => { if (activeConvId) emitTyping(activeConvId, true); }}
               disabled={!activeConvId}
               placeholder="Type a message..."
             />

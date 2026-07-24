@@ -12,7 +12,6 @@ const messageInclude = {
   file: { select: { id: true, name: true, originalName: true, mimeType: true, size: true, path: true, bucket: true } },
   readReceipts: { include: { user: { select: { id: true, name: true, email: true, avatar: true } } } },
   reactions: { include: { user: { select: { id: true, name: true, avatar: true } } } },
-  starredBy: { where: { userId: '' }, take: 1, select: { id: true } },
 } as const;
 
 export class ChatRepository {
@@ -149,7 +148,7 @@ export class ChatRepository {
       take: limit + 1,
       include: {
         ...messageInclude,
-        starredBy: { where: { userId: '' }, take: 0, select: { id: true } },
+        starredBy: { take: 0, select: { id: true } },
       },
     });
   }
@@ -168,24 +167,25 @@ export class ChatRepository {
     forwardedFromId?: string;
     metadata?: Record<string, unknown>;
   }) {
-    const message = await prisma.chatMessage.create({
-      data: {
-        conversationId: data.conversationId,
-        senderId: data.senderId,
-        content: data.content,
-        messageType: (data.messageType ?? 'text') as any,
-        messageStatus: (data.messageStatus ?? 'sent') as any,
-        fileUrl: data.fileUrl,
-        fileName: data.fileName,
-        fileSize: data.fileSize,
-        fileId: data.fileId,
-        replyToId: data.replyToId,
-        forwardedFromId: data.forwardedFromId,
-        isForwarded: !!data.forwardedFromId,
-        metadata: (data.metadata ?? {}) as Prisma.InputJsonValue,
-      },
-      include: messageInclude,
-    });
+    const prismaData = {
+      conversationId: data.conversationId,
+      senderId: data.senderId,
+      content: data.content,
+      messageType: (data.messageType ?? 'text') as any,
+      messageStatus: (data.messageStatus ?? 'sent') as any,
+      fileUrl: data.fileUrl || undefined,
+      fileName: data.fileName || undefined,
+      fileSize: data.fileSize || undefined,
+      fileId: data.fileId || undefined,
+      replyToId: data.replyToId || undefined,
+      forwardedFromId: data.forwardedFromId || undefined,
+      isForwarded: !!data.forwardedFromId,
+      metadata: (data.metadata ?? {}) as Prisma.InputJsonValue,
+    };
+
+    console.log('[ChatRepository.sendMessage] inserting message');
+
+    const message = await prisma.chatMessage.create({ data: prismaData, include: messageInclude });
     await prisma.chatConversation.update({
       where: { id: data.conversationId },
       data: { lastMessageAt: new Date(), updatedAt: new Date() },

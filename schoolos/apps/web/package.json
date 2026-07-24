@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "powershell -NoProfile -Command \"$s=Start-Process -NoNewWindow -PassThru node 'socket-server.js'; try { next dev } finally { $s.Kill() }\"",
+    "dev:next": "next dev",
     "dev:socket": "node socket-server.js",
     "dev:all": "powershell -NoProfile -Command \"$s=Start-Process -NoNewWindow -PassThru node 'socket-server.js'; try { next dev } finally { $s.Kill() }\"",
     "build": "next build",

@@ -122,15 +122,15 @@ export async function sendMessageAction(payload: SendMessagePayload) {
     const data = await ChatRepository.sendMessage({
       conversationId: payload.conversationId,
       senderId: user.id,
-      content: payload.content,
-      messageType: payload.messageType,
-      messageStatus: payload.messageStatus,
-      fileUrl: payload.fileUrl,
-      fileName: payload.fileName,
-      fileSize: payload.fileSize,
-      fileId: payload.fileId,
-      replyToId: payload.replyToId,
-      forwardedFromId: payload.forwardedFromId,
+      content: payload.content ?? '',
+      messageType: payload.messageType || undefined,
+      messageStatus: payload.messageStatus || undefined,
+      fileUrl: payload.fileUrl || undefined,
+      fileName: payload.fileName || undefined,
+      fileSize: payload.fileSize || undefined,
+      fileId: payload.fileId || undefined,
+      replyToId: payload.replyToId || undefined,
+      forwardedFromId: payload.forwardedFromId || undefined,
     });
 
     return { success: true as const, data: data as unknown as ChatMessage };

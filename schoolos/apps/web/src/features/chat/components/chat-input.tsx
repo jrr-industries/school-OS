@@ -62,7 +62,7 @@ export function ChatInput({
     const file = e.target.files?.[0];
     if (!file || !onSendFile) return;
     setUploading(true);
-    try { onSendFile(file); }
+    try { await onSendFile(file); }
     finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
